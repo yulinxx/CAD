@@ -9,7 +9,7 @@
 #include "UiShell/Contract/TitleBarSpec.h"
 #include "Model/Spec/WindowSpec.h"
 
-namespace RD
+namespace AA
 {
     // 子区域配置：profile 中声明的子区域原始数据，尚未做过滤与排序。
     struct PaneAreaSpec
@@ -111,4 +111,4 @@ namespace RD
         TitleBarSpec titleBar;
         WindowSpec window;
     };
-}  // namespace RD
+}  // namespace AA

@@ -4,7 +4,7 @@
 #include <QLabel>
 #include <QWidget>
 
-namespace RD::test
+namespace AA::test
 {
     void FakeCommandInvoker::invoke(const QString& commandId)
     {
@@ -129,4 +129,4 @@ namespace RD::test
     {
         return m_service ? m_service->lastError() : QString();
     }
-} // namespace RD::test
+} // namespace AA::test

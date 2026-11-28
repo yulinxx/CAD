@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace RD
+namespace AA
 {
     // 文本 strId → 实际文字的只读接口
     class ITextProvider
@@ -13,4 +13,4 @@ namespace RD
     public:
         virtual QString text(const QString& key) const = 0;
     };
-}  // namespace RD
+}  // namespace AA

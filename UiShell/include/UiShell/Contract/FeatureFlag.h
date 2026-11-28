@@ -7,7 +7,7 @@
 #include "UiShell/Export.h"
 #include "UiShell/Contract/IApiObject.h"
 
-namespace RD
+namespace AA
 {
     // 功能开关集合
     class FeatureFlagSet
@@ -87,4 +87,4 @@ namespace RD
 
     // 创建空的功能开关 store；订阅回调派发到创建线程，应在 GUI 线程创建。
     UI_SHELL_API IFeatureFlagStore* createFeatureFlagStore();
-}  // namespace RD
+}  // namespace AA

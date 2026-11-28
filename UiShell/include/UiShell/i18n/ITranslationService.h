@@ -6,7 +6,7 @@
 #include "UiShell/Export.h"
 #include "UiShell/Contract/IApiObject.h"
 
-namespace RD
+namespace AA
 {
     class ITranslationService : public IApiObject
     {
@@ -32,4 +32,4 @@ namespace RD
     };
 
     UI_SHELL_API ITranslationService* createTranslationService();
-}  // namespace RD
+}  // namespace AA

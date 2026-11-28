@@ -3,7 +3,7 @@
 #include <QByteArray>
 #include <QString>
 
-namespace RD
+namespace AA
 {
     // JSONC（带注释的 JSON）预处理结果
     //
@@ -17,4 +17,4 @@ namespace RD
         int errorLine = 0;  // 1 基行号，仅在 ok 为 false 时有意义
         QString error;
     };
-}  // namespace RD
+}  // namespace AA

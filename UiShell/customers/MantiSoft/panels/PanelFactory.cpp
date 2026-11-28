@@ -18,15 +18,15 @@
 
 namespace
 {
-    using RetranslatableLabel = RD::Retranslatable<QLabel>;
-    using RetranslatableFrame = RD::Retranslatable<QFrame>;
+    using RetranslatableLabel = AA::Retranslatable<QLabel>;
+    using RetranslatableFrame = AA::Retranslatable<QFrame>;
 
     // 状态栏面板：显示 IShellHost::showMessage() 推来的提示；语言切换时恢复默认文字。
-    class StatusLabel final : public RD::Retranslatable<QLabel>, public RD::IStatusMessageView
+    class StatusLabel final : public AA::Retranslatable<QLabel>, public AA::IStatusMessageView
     {
     public:
         explicit StatusLabel(QWidget* parent)
-            : RD::Retranslatable<QLabel>(parent)
+            : AA::Retranslatable<QLabel>(parent)
         {
         }
 
@@ -54,14 +54,14 @@ namespace MS
 {
     // —— PanelFactory ——
 
-    QWidget* PanelFactory::create(const RD::PanelCreateRequest& info)
+    QWidget* PanelFactory::create(const AA::PanelCreateRequest& info)
     {
         // —— 左侧工具栏 + 展开面板：MantiSoft 自己的 LeftToolBar / LeftToolWidget 组合 ——
         if (info.strPanelId == QLatin1String("tools"))
         {
             auto* panel = new MS::LeftSidePanel(info.host, info.parent);
             panel->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-            RD::markPanel(panel, QStringLiteral("panel"), QStringLiteral("mantisoft"));
+            AA::markPanel(panel, QStringLiteral("panel"), QStringLiteral("mantisoft"));
             return panel;
         }
 
@@ -70,7 +70,7 @@ namespace MS
         {
             auto* panel = new MS::RightSidePanel(info.host, info.parent);
             panel->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-            RD::markPanel(panel, QStringLiteral("panel"), QStringLiteral("mantisoft"));
+            AA::markPanel(panel, QStringLiteral("panel"), QStringLiteral("mantisoft"));
             return panel;
         }
 
@@ -82,7 +82,7 @@ namespace MS
             // 其余标签仅做 UI 占位，后续由 Mode / 业务模块按需注入真实数据源。
             auto* bar = new QWidget(info.parent);
             bar->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-            RD::markPanel(bar, QStringLiteral("panelStatus"), QStringLiteral("mantisoft"));
+            AA::markPanel(bar, QStringLiteral("panelStatus"), QStringLiteral("mantisoft"));
 
             auto* hLay = new QHBoxLayout(bar);
             hLay->setContentsMargins(8, 2, 8, 2);
@@ -133,14 +133,14 @@ namespace MS
 
         auto* frame = new RetranslatableFrame(info.parent);
         frame->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-        RD::markPanel(frame, QStringLiteral("panel"), QStringLiteral("mantisoft"));
+        AA::markPanel(frame, QStringLiteral("panel"), QStringLiteral("mantisoft"));
 
         auto* layout = new QVBoxLayout(frame);
         layout->setContentsMargins(10, 8, 10, 8);
         layout->setSpacing(6);
 
         auto* title = new QLabel(panelTitle(info.strPanelId), frame);
-        RD::markPanel(title, QStringLiteral("panelTitle"), QStringLiteral("mantisoft"));
+        AA::markPanel(title, QStringLiteral("panelTitle"), QStringLiteral("mantisoft"));
         layout->addWidget(title);
         frame->onRetranslate([title, panelId = info.strPanelId]() {
             title->setText(panelTitle(panelId));
@@ -174,7 +174,7 @@ namespace MS
         view->setObjectName(QStringLiteral("center.view"));
         view->setAlignment(Qt::AlignCenter);
         view->setMinimumSize(420, 300);
-        RD::markPanel(view, QStringLiteral("centerView"), QStringLiteral("mantisoft"));
+        AA::markPanel(view, QStringLiteral("centerView"), QStringLiteral("mantisoft"));
         view->onRetranslate([view]() {
             view->setText(QCoreApplication::translate("MantiSoft", "MantiSoft Central Design Area"));
             });

@@ -10,7 +10,7 @@
 #include "UiShell/Contract/ITextProvider.h"
 #include "UiShell/i18n/ITranslationService.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -112,4 +112,4 @@ namespace RD
 
         return effective;
     }
-}  // namespace RD
+}  // namespace AA

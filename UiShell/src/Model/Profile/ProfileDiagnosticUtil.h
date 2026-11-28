@@ -5,7 +5,7 @@
 
 #include "Model/Profile/ProfileLoadResult.h"
 
-namespace RD
+namespace AA
 {
     // Diagnostic 构造辅助 — 公共工具，放在命名空间中避免 unity build 下匿名命名空间冲突
     static inline Diagnostic makeDiagnostic(Diagnostic::Level level, const QString& jsonPath, const QString& message)
@@ -26,4 +26,4 @@ namespace RD
     {
         diagnostics.append(makeDiagnostic(Diagnostic::Level::Warning, path, message));
     }
-}  // namespace RD
+}  // namespace AA

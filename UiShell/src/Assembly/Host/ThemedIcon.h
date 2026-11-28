@@ -8,7 +8,7 @@
 #include <QPalette>
 #include <QSize>
 
-namespace RD
+namespace AA
 {
     // 按当前调色板的文字色给图标着色
     inline QIcon themedIcon(const QString& key)
@@ -36,4 +36,4 @@ namespace RD
 
         return QIcon(pixmap);
     }
-}  // namespace RD
+}  // namespace AA

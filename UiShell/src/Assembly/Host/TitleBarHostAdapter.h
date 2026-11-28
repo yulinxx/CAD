@@ -7,7 +7,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class IWindowFrame;
     class ITitleBarView;
@@ -48,4 +48,4 @@ namespace RD
         QPointer<QWidget> m_titleBarWidget;
         ITitleBarView* m_titleBar = nullptr;
     };
-}  // namespace RD
+}  // namespace AA

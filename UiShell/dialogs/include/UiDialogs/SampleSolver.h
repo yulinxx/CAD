@@ -4,7 +4,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace RD::samples
+namespace AA::samples
 {
     // 示例算法的参数：与界面无关，对话框只负责收集它，命令拿它调用算法。
     // JSON 键与客户代码绑定的 params、DialogResult.data 一致：
@@ -45,4 +45,4 @@ namespace RD::samples
 
     // 示例算法：求 sqrt(target)。纯函数，不依赖任何窗口，可单独单测。
     SampleResult solveSquareRoot(const SampleParams& params);
-}  // namespace RD::samples
+}  // namespace AA::samples

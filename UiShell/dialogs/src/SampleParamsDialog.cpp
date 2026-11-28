@@ -12,7 +12,7 @@
 
 #include "UiDialogs/SampleDialogs.h"
 
-namespace RD::samples
+namespace AA::samples
 {
     SampleParamsDialog::SampleParamsDialog(const QJsonObject& params, QWidget* parent)
         : QDialog(parent)
@@ -86,4 +86,4 @@ namespace RD::samples
         params.method = m_method->currentData().toString();
         return params;
     }
-}  // namespace RD::samples
+}  // namespace AA::samples

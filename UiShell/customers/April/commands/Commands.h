@@ -7,46 +7,46 @@
 #include <QString>
 #include <QVariantMap>
 
-#include "UiShell/Contract/Command.h"   // RD::ICommandCatalog / ICommandInvoker / ICommandState
+#include "UiShell/Contract/Command.h"   // AA::ICommandCatalog / ICommandInvoker / ICommandState
 
 #include "OperationCommandSink.h"       // M6：不再依赖旧 ClientConfig/IUiCommandDispatcher
 
 namespace Apr
 {
     // M6：把现有 CAD 命令体系（OperationBus）与 UiShell 外壳命令
-    // 适配到 RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState。
+    // 适配到 AA::ICommandCatalog + AA::ICommandInvoker + AA::ICommandState。
     // 不再经过旧 WorkbenchWindow / UiWorkbench / IUiCommandDispatcher。
-    class Commands : public RD::ICommandCatalog,
-                     public RD::ICommandInvoker,
-                     public RD::ICommandState,
-                     public RD::ICommandProfileRegistrar
+    class Commands : public AA::ICommandCatalog,
+                     public AA::ICommandInvoker,
+                     public AA::ICommandState,
+                     public AA::ICommandProfileRegistrar
     {
     public:
         Commands() = default;
 
-        // ---------------- RD::ICommandCatalog ----------------
-        const RD::CommandView* find(const QString& commandId) const override;
+        // ---------------- AA::ICommandCatalog ----------------
+        const AA::CommandView* find(const QString& commandId) const override;
 
-        // ---------------- RD::ICommandInvoker ----------------
+        // ---------------- AA::ICommandInvoker ----------------
         void invoke(const QString& commandId) override;
         void invokeWithArgs(const QString& commandId, const QJsonObject& args) override;
 
-        // ---------------- RD::ICommandState ----------------
-        void queryState(const QString& commandId, RD::CommandStatus& status) const override;
+        // ---------------- AA::ICommandState ----------------
+        void queryState(const QString& commandId, AA::CommandStatus& status) const override;
 
         // ---------------- 装配 ----------------
-        void addCommand(const RD::CommandView& command);              ///< 登记命令元数据
+        void addCommand(const AA::CommandView& command);              ///< 登记命令元数据
         int addCommandsFromProfile(const QByteArray& profileJson);    ///< 从客户 profile 的 menus 递归登记命令
-        int registerFromProfile(const QByteArray& profileJson) override;  ///< RD::ICommandProfileRegistrar
+        int registerFromProfile(const QByteArray& profileJson) override;  ///< AA::ICommandProfileRegistrar
         void setSink(ICommandSink* sink);        ///< 客户侧命令出口
         ICommandSink* sink() const;
 
-        const QList<RD::CommandView>& commands() const;
+        const QList<AA::CommandView>& commands() const;
 
     private:
         void collectCommands(const QJsonArray& nodes);               ///< 递归收集 type=command 的节点
 
-        QList<RD::CommandView> m_commands;
+        QList<AA::CommandView> m_commands;
         ICommandSink* m_sink = nullptr;
     };
 }  // namespace Apr

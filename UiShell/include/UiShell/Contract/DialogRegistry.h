@@ -8,7 +8,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     // 对话框返回结果
     struct DialogResult
@@ -68,4 +68,4 @@ namespace RD
 
     // 创建对话框工厂注册表，由 shell 创建，调用方通过 destroy() 释放
     UI_SHELL_API IDialogFactoryRegistry* createDialogRegistry();
-}  // namespace RD
+}  // namespace AA

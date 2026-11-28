@@ -9,7 +9,7 @@
 
 namespace GL
 {
-    QmlPanelWidget::QmlPanelWidget(const RD::HostContext& context,
+    QmlPanelWidget::QmlPanelWidget(const AA::HostContext& context,
         const QString& panelId,
         QWidget* parent)
         : QQuickWidget(parent)
@@ -33,7 +33,7 @@ namespace GL
         }
     }
 
-    void QmlPanelWidget::setHostContext(const RD::HostContext& context)
+    void QmlPanelWidget::setHostContext(const AA::HostContext& context)
     {
         m_context = context;
         applyContextProperties();

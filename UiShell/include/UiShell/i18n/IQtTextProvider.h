@@ -4,7 +4,7 @@
 #include "UiShell/Contract/IApiObject.h"
 #include "UiShell/Contract/ITextProvider.h"
 
-namespace RD
+namespace AA
 {
     // Qt 翻译实现接口
     class IQtTextProvider : public ITextProvider, public IApiObject
@@ -15,4 +15,4 @@ namespace RD
     };
 
     UI_SHELL_API IQtTextProvider* createQtTextProvider();
-}  // namespace RD
+}  // namespace AA

@@ -2,7 +2,7 @@
 
 #include <QLatin1Char>
 
-namespace RD
+namespace AA
 {
     QString textContextForKey(const QString& key)
     {
@@ -14,4 +14,4 @@ namespace RD
 
         return key.left(separator);
     }
-}  // namespace RD
+}  // namespace AA

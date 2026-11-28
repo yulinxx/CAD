@@ -8,7 +8,7 @@
 #include "SampleParamsDialog.h"
 #include "UiShell/Contract/ModalDialog.h"
 
-namespace RD::samples
+namespace AA::samples
 {
     DialogResult SampleParamsDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
@@ -56,4 +56,4 @@ namespace RD::samples
             describeResult(params, result));
         return true;
     }
-}  // namespace RD::samples
+}  // namespace AA::samples

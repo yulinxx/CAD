@@ -2,7 +2,7 @@
 
 #include "UiShell/Contract/WidgetFactory.h"
 
-namespace RD
+namespace AA
 {
     // shell 自带的通用工具栏面板
     inline constexpr const char* kToolBarFactoryId = "msui.toolbar";
@@ -13,4 +13,4 @@ namespace RD
         QWidget* create(const PanelCreateRequest& info) override;
         PropsValidation validateProps(const QJsonObject& props) const override;
     };
-}  // namespace RD
+}  // namespace AA

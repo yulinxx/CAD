@@ -4,7 +4,7 @@
 
 #include "UiShell/Contract/WidgetFactory.h"
 
-namespace RD
+namespace AA
 {
     // 简单工厂注册表
     class WidgetFactoryRegistry final : public IWidgetFactoryRegistry
@@ -22,4 +22,4 @@ namespace RD
     private:
         QHash<QString, IWidgetFactory*> m_factories;
     };
-}  // namespace RD
+}  // namespace AA

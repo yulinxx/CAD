@@ -2,7 +2,7 @@
 
 #include "UiShell/i18n/IQtTextProvider.h"
 
-namespace RD
+namespace AA
 {
     // 具体类不导出：调用方使用 createQtTextProvider() 返回的 IQtTextProvider*。
     class QtTextProvider final : public IQtTextProvider
@@ -15,4 +15,4 @@ namespace RD
             delete this;
         }
     };
-}  // namespace RD
+}  // namespace AA

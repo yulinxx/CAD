@@ -43,7 +43,7 @@ namespace Apr
 {
     void OperationCommandSink::dispatch(const QString& commandId, const QVariantMap& params)
     {
-        RD::IShellRuntime* runtime = RD::activeRuntime();
+        AA::IShellRuntime* runtime = AA::activeRuntime();
 
         if (commandId.startsWith(QLatin1String("theme.")))
         {
@@ -60,7 +60,7 @@ namespace Apr
         if (commandId == QLatin1String("help.about"))
         {
             if (runtime)
-                runtime->openDialog(QString::fromLatin1(RD::about::kAboutDlgId), nullptr);
+                runtime->openDialog(QString::fromLatin1(AA::about::kAboutDlgId), nullptr);
             return;
         }
         if (commandId == QLatin1String("view.switch_to_2d") || commandId == QLatin1String("view.switch_to_3d"))
@@ -69,6 +69,10 @@ namespace Apr
                 m_workbenchSwitch(commandId);
             else
                 APR_WARNF("[OperationCommandSink] Workbench switch has no host: %s", qPrintable(commandId));
+            // The workbench switch only changes customer state; the shell owns the
+            // central widget and must be asked to mount the new viewport.
+            if (runtime)
+                runtime->refreshCenterView();
             return;
         }
 

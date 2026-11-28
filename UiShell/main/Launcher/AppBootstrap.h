@@ -10,7 +10,7 @@ class CustomerModuleProvider;
 class StartupSession;
 class TranslationSetup;
 
-class AppBootstrap : private RD::IShellListener
+class AppBootstrap : private AA::IShellListener
 {
 public:
     AppBootstrap();
@@ -22,12 +22,12 @@ public:
 public:
     int start(QMainWindow* window);
 
-    RD::IShellRuntime* runtime() const
+    AA::IShellRuntime* runtime() const
     {
         return m_shellRT.get();
     }
 
-    RD::IFeatureFlagStore* featureFlags() const
+    AA::IFeatureFlagStore* featureFlags() const
     {
         return m_featureFlags.get();
     }
@@ -44,10 +44,10 @@ private:
     std::unique_ptr<TranslationSetup> m_transSetup;
 
     // shell 创建的对象，ApiPtr 自动在 shell DLL 内 destroy()
-    RD::ApiPtr<RD::IFeatureFlagStore> m_featureFlags;
-    RD::ApiPtr<RD::IWidgetFactoryRegistry> m_widgetReg;
-    RD::ApiPtr<RD::IDialogFactoryRegistry> m_dlgReg;
-    RD::ApiPtr<RD::IShellRuntime> m_shellRT;
+    AA::ApiPtr<AA::IFeatureFlagStore> m_featureFlags;
+    AA::ApiPtr<AA::IWidgetFactoryRegistry> m_widgetReg;
+    AA::ApiPtr<AA::IDialogFactoryRegistry> m_dlgReg;
+    AA::ApiPtr<AA::IShellRuntime> m_shellRT;
 
     std::unique_ptr<StartupSession> m_startupSession;
 };

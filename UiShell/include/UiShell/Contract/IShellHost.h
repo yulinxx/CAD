@@ -8,7 +8,7 @@
 class QAction;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     // 面板宿主
     class IShellHost
@@ -37,4 +37,4 @@ namespace RD
         // 打开对话框
         virtual DialogResult openDialog(const QString& dialogId, QWidget* parent, const QJsonObject& params = {}) = 0;
     };
-}  // namespace RD
+}  // namespace AA

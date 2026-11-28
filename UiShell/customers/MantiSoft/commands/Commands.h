@@ -7,7 +7,7 @@ namespace MS
     // 客户 MantiSoft 的命令：目录 + 执行 + 状态都在一张命令表里（CommandTable）。
     // 菜单、工具栏、面板按钮与快捷键只引用命令 id，执行的都是这里登记的处理函数。
     // 示例状态：「保存」只有在「新建 / 打开」之后才可用，所有入口一起置灰 / 恢复。
-    class Commands final : public RD::CommandTable
+    class Commands final : public AA::CommandTable
     {
     public:
         Commands();

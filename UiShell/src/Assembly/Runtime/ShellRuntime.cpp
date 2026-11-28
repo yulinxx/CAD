@@ -54,7 +54,7 @@ namespace
     }
 }  // namespace
 
-namespace RD
+namespace AA
 {
     ShellRuntime::ShellRuntime(const ShellServices& services)
         : m_shellServices(services)
@@ -443,8 +443,14 @@ namespace RD
         m_shellView->retranslate();
     }
 
+    void ShellRuntime::refreshCenterView()
+    {
+        if (m_shellView)
+            m_shellView->refreshCenterView();
+    }
+
     IShellRuntime* createShellRuntime(const ShellServices& services)
     {
         return new ShellRuntime(services);
     }
-}  // namespace RD
+}  // namespace AA

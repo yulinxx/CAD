@@ -14,7 +14,7 @@
 #include "ProfileSchema.h"
 #include "ProfileValidator.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -577,4 +577,4 @@ namespace RD
 
         return result;
     }
-}  // namespace RD
+}  // namespace AA

@@ -12,7 +12,7 @@
 #include "Platform/WindowFrame.h"
 #include "UiShell/Titlebar/ITitleBarView.h"
 
-namespace RD
+namespace AA
 {
     TitleBarHostAdapter::TitleBarHostAdapter(QObject* parent)
         : QObject(parent)
@@ -142,4 +142,4 @@ namespace RD
 
         window->setGeometry(target);
     }
-}  // namespace RD
+}  // namespace AA

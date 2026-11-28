@@ -2,10 +2,12 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QHash>
 #include <QLocale>
+#include <QStringList>
 #include <QTranslator>
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -15,6 +17,14 @@ namespace RD
         const QString kKoKr = QStringLiteral("ko_KR");
         const QString kRuRu = QStringLiteral("ru_RU");
         const QString kDeDe = QStringLiteral("de_DE");
+        const QString kFrFr = QStringLiteral("fr_FR");
+        const QString kEsEs = QStringLiteral("es_ES");
+        const QString kPtPt = QStringLiteral("pt_PT");
+        const QString kArAr = QStringLiteral("ar_AR");
+        const QString kItIt = QStringLiteral("it_IT");
+        const QString kHiIn = QStringLiteral("hi_IN");
+        const QString kTrTr = QStringLiteral("tr_TR");
+        const QString kViVn = QStringLiteral("vi_VN");
 
         // 框架 DLL 的翻译文件固定叫 UiShell_<language>.qm。
         const QString kShellModule = QStringLiteral("UiShell");
@@ -32,6 +42,28 @@ namespace RD
 
             return fileName.left(fileName.size() - suffix.size());
         }
+
+        // 历史客户 .qm 用短码命名（April_zh.qm）；规范化后的 locale id 仍优先，
+        // 短码只在别名阶段补装，避免为一个客户把命名规则写进通用加载器。
+        QStringList shortCodeAliases(const QString& language)
+        {
+            static const QHash<QString, QStringList> aliases{
+                { kZhCn, QStringList{ QStringLiteral("zh") } },
+                { kJaJp, QStringList{ QStringLiteral("ja") } },
+                { kKoKr, QStringList{ QStringLiteral("ko") } },
+                { kRuRu, QStringList{ QStringLiteral("ru") } },
+                { kDeDe, QStringList{ QStringLiteral("de") } },
+                { kFrFr, QStringList{ QStringLiteral("fr") } },
+                { kEsEs, QStringList{ QStringLiteral("es") } },
+                { kPtPt, QStringList{ QStringLiteral("pt") } },
+                { kArAr, QStringList{ QStringLiteral("ar") } },
+                { kItIt, QStringList{ QStringLiteral("it") } },
+                { kHiIn, QStringList{ QStringLiteral("hi") } },
+                { kTrTr, QStringList{ QStringLiteral("tr") } },
+                { kViVn, QStringList{ QStringLiteral("vi") } },
+            };
+            return aliases.value(language);
+        }
     }  // namespace
 
     TranslationService::TranslationService()
@@ -46,7 +78,8 @@ namespace RD
     QStringList TranslationService::builtinLanguages() const
     {
         // 英文是源语言，放在首位作为默认与最终回退。
-        return { kEnUs, kZhCn, kJaJp, kKoKr, kRuRu, kDeDe };
+        return { kEnUs, kZhCn, kJaJp, kKoKr, kFrFr, kDeDe, kEsEs, kPtPt,
+            kRuRu, kArAr, kItIt, kHiIn, kTrTr, kViVn };
     }
 
     QString TranslationService::normalizeLanguageId(const QString& id) const
@@ -69,10 +102,26 @@ namespace RD
             return kJaJp;
         if (lower.startsWith(QLatin1String("ko")))
             return kKoKr;
-        if (lower.startsWith(QLatin1String("ru")))
-            return kRuRu;
+        if (lower.startsWith(QLatin1String("fr")))
+            return kFrFr;
         if (lower.startsWith(QLatin1String("de")))
             return kDeDe;
+        if (lower.startsWith(QLatin1String("es")))
+            return kEsEs;
+        if (lower.startsWith(QLatin1String("pt")))
+            return kPtPt;
+        if (lower.startsWith(QLatin1String("ru")))
+            return kRuRu;
+        if (lower.startsWith(QLatin1String("ar")))
+            return kArAr;
+        if (lower.startsWith(QLatin1String("it")))
+            return kItIt;
+        if (lower.startsWith(QLatin1String("hi")))
+            return kHiIn;
+        if (lower.startsWith(QLatin1String("tr")))
+            return kTrTr;
+        if (lower.startsWith(QLatin1String("vi")))
+            return kViVn;
         return trimmed;
     }
 
@@ -137,6 +186,15 @@ namespace RD
 
     int TranslationService::loadLanguage(const QString& lang)
     {
+        // 规范化文件名优先；历史短码文件名作为别名补装。
+        int loaded = loadLanguageFiles(lang);
+        for (const QString& alias : shortCodeAliases(lang))
+            loaded += loadLanguageFiles(alias);
+        return loaded;
+    }
+
+    int TranslationService::loadLanguageFiles(const QString& lang)
+    {
         int loaded = 0;
 
         // shell 自己的 .qm 必须先装上：菜单/标题栏/关于框都靠它。
@@ -163,6 +221,10 @@ namespace RD
 
     bool TranslationService::loadFile(const QString& path)
     {
+        // 同一个文件可能同时匹配规范化名与短码别名；只装一次，避免重复 translator。
+        if (m_loadedFiles.contains(path))
+            return false;
+
         auto* translator = new QTranslator;
         if (!translator->load(path))
         {
@@ -216,4 +278,4 @@ namespace RD
     {
         return new TranslationService;
     }
-}  // namespace RD
+}  // namespace AA

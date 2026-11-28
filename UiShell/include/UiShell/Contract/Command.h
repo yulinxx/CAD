@@ -6,7 +6,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace RD
+namespace AA
 {
     // 命令视图
     struct CommandView
@@ -71,4 +71,4 @@ namespace RD
             invoke(commandId);
         }
     };
-}  // namespace RD
+}  // namespace AA

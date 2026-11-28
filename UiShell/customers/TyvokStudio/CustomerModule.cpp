@@ -27,14 +27,14 @@ namespace TS
         }
 
         // 客户的全部部件
-        class ModuleParts final : public RD::IApiObject
+        class ModuleParts final : public AA::IApiObject
         {
         public:
             PanelFactory panelsFactory;
             CenterView centerView;
             Commands commands;
             AboutDialogFactory aboutDlgFactory;                   // 本客户的关于框
-            RD::samples::SampleParamsDialogFactory sampleParams;  // 测试用: 示例参数对话框
+            AA::samples::SampleParamsDialogFactory sampleParams;  // 测试用: 示例参数对话框
 
             void destroy() override
             {
@@ -44,7 +44,7 @@ namespace TS
     }  // namespace
 }  // namespace TS
 
-namespace RD
+namespace AA
 {
     const char* customerBuildFingerprint() noexcept
     {
@@ -76,14 +76,14 @@ namespace RD
         module.listWidgetFactoriesBind.append({ QStringLiteral("tyvokstudio.panel"), &parts->panelsFactory });
 
         // 注册关于对话框工厂
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDlgFactory });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::about::kAboutDlgId), &parts->aboutDlgFactory });
         // 注册示例参数对话框工厂
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::samples::kSampleParamsDlgId), &parts->sampleParams });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::samples::kSampleParamsDlgId), &parts->sampleParams });
 
         // 命令→对话框绑定（客户代码拥有，取代 ui.json 的 dialogBindings）。
         // help.about：关于框不需要参数，全部数据由 AboutDialogFactory 自翻译。
-        module.listDialogBind.append({ QString::fromLatin1(RD::about::kAboutCmdId),
-            QString::fromLatin1(RD::about::kAboutDlgId),
+        module.listDialogBind.append({ QString::fromLatin1(AA::about::kAboutCmdId),
+            QString::fromLatin1(AA::about::kAboutDlgId),
             QJsonObject{ { QStringLiteral("logoPath"), QStringLiteral("assets/logo.png") } },
             DialogContinuePolicy::Never });
         // sample.run：先弹参数对话框（默认值写在 params），确定后把数据交给 runSample 命令；
@@ -95,8 +95,8 @@ namespace RD
             { QStringLiteral("method"), QStringLiteral("bisection") },
             { QStringLiteral("methods"), QJsonArray{ QStringLiteral("bisection") } }
         };
-        module.listDialogBind.append({ QString::fromLatin1(RD::samples::kSampleRunCmdId),
-            QString::fromLatin1(RD::samples::kSampleParamsDlgId), sampleParams });
+        module.listDialogBind.append({ QString::fromLatin1(AA::samples::kSampleRunCmdId),
+            QString::fromLatin1(AA::samples::kSampleParamsDlgId), sampleParams });
         return module;
     }
-}  // namespace RD
+}  // namespace AA

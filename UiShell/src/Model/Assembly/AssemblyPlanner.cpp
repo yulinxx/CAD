@@ -12,7 +12,7 @@
 #include "UiShell/Contract/Command.h"
 #include "UiShell/Contract/ITextProvider.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -331,4 +331,4 @@ namespace RD
     {
         return AssemblyPlanner().build(model, flags, catalog, text);
     }
-}  // namespace RD
+}  // namespace AA

@@ -1,7 +1,7 @@
 #include "Model/Spec/WindowSpec.h"
 #include "Platform/WindowFrame.h"
 
-namespace RD
+namespace AA
 {
 #if defined(Q_OS_WIN)
     std::unique_ptr<IWindowFrame> createWindowsWindowFrame();
@@ -17,4 +17,4 @@ namespace RD
         return createQtWindowFrame();
 #endif
     }
-}  // namespace RD
+}  // namespace AA

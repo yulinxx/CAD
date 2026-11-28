@@ -1,6 +1,6 @@
 #pragma once
 
-namespace RD
+namespace AA
 {
     class IShellRuntime;
 
@@ -9,4 +9,4 @@ namespace RD
     // 因此通过外壳发布的单一指针获取。纯头契约，不跨 CRT 传对象。
     void setActiveRuntime(IShellRuntime* runtime);
     IShellRuntime* activeRuntime();
-}  // namespace RD
+}  // namespace AA

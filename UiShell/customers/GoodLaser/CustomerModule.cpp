@@ -27,7 +27,7 @@ namespace GL
         }
 
         // 全部部件
-        class ModuleParts final : public RD::IApiObject
+        class ModuleParts final : public AA::IApiObject
         {
         public:
             PanelFactory panels;
@@ -46,7 +46,7 @@ namespace GL
     }  // namespace
 }  // namespace GL
 
-namespace RD
+namespace AA
 {
     const char* customerBuildFingerprint() noexcept
     {
@@ -76,12 +76,12 @@ namespace RD
         module.cmdState = &parts->commands;
         module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
 
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDialog });
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::samples::kSampleParamsDlgId), &parts->sampleParams });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::about::kAboutDlgId), &parts->aboutDialog });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::samples::kSampleParamsDlgId), &parts->sampleParams });
 
         // 命令→对话框绑定
-        module.listDialogBind.append({ QString::fromLatin1(RD::about::kAboutCmdId),
-            QString::fromLatin1(RD::about::kAboutDlgId),
+        module.listDialogBind.append({ QString::fromLatin1(AA::about::kAboutCmdId),
+            QString::fromLatin1(AA::about::kAboutDlgId),
             QJsonObject{ { QStringLiteral("logoPath"), QStringLiteral("assets/logo.png") } },
             DialogContinuePolicy::Never });
 
@@ -91,8 +91,8 @@ namespace RD
             { QStringLiteral("tolerance"), 1e-8 }
         };
 
-        module.listDialogBind.append({ QString::fromLatin1(RD::samples::kSampleRunCmdId),
-            QString::fromLatin1(RD::samples::kSampleParamsDlgId), sampleParams });
+        module.listDialogBind.append({ QString::fromLatin1(AA::samples::kSampleRunCmdId),
+            QString::fromLatin1(AA::samples::kSampleParamsDlgId), sampleParams });
         return module;
     }
-}  // namespace RD
+}  // namespace AA

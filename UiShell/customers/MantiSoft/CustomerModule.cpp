@@ -26,14 +26,14 @@ namespace MS
 
         // 本客户的全部部件：一个堆对象，CustomerModule 里的指针都指向它的成员。
         // 宿主经 CustomerModule::owner 接管，在运行期销毁后调用 destroy()；不使用任何全局变量。
-        class ModuleParts final : public RD::IApiObject
+        class ModuleParts final : public AA::IApiObject
         {
         public:
             PanelFactory panels;
             CenterView centerView;
             Commands commands;
             MS::AboutDialogFactory aboutDialog;                    // 客户定制的关于框（覆盖共享默认实现）
-            RD::samples::SampleParamsDialogFactory sampleParams;  // 共享默认的示例参数对话框。
+            AA::samples::SampleParamsDialogFactory sampleParams;  // 共享默认的示例参数对话框。
 
             void destroy() override
             {
@@ -43,7 +43,7 @@ namespace MS
     }  // namespace
 }  // namespace MS
 
-namespace RD
+namespace AA
 {
     const char* customerBuildFingerprint() noexcept
     {
@@ -73,14 +73,14 @@ namespace RD
         module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
 
         // 关于对话框：注册本客户定制实现；产品/版本等内容由 AboutDialogFactory 自翻译。
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDialog });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::about::kAboutDlgId), &parts->aboutDialog });
         // 示例参数对话框：注册共享默认实现（UiDialogs）；需要不同界面的客户用同一 id 注册自己的工厂（见 GoodLaser）。
-        module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::samples::kSampleParamsDlgId), &parts->sampleParams });
+        module.listDlgFactoriesBind.append({ QString::fromLatin1(AA::samples::kSampleParamsDlgId), &parts->sampleParams });
 
         // 命令→对话框绑定（客户代码拥有，取代 ui.json 的 dialogBindings）。
         // help.about：关于框不需要参数，全部数据由 AboutDialogFactory 自翻译。
-        module.listDialogBind.append({ QString::fromLatin1(RD::about::kAboutCmdId),
-            QString::fromLatin1(RD::about::kAboutDlgId),
+        module.listDialogBind.append({ QString::fromLatin1(AA::about::kAboutCmdId),
+            QString::fromLatin1(AA::about::kAboutDlgId),
             QJsonObject{ { QStringLiteral("logoPath"), QStringLiteral("assets/logo.svg") } },
             DialogContinuePolicy::Never });
         // sample.run：先弹参数对话框（默认值写在 params），确定后把数据交给 runSample 命令。
@@ -90,8 +90,8 @@ namespace RD
             { QStringLiteral("tolerance"), 1e-6 },
             { QStringLiteral("method"), QStringLiteral("newton") }
         };
-        module.listDialogBind.append({ QString::fromLatin1(RD::samples::kSampleRunCmdId),
-            QString::fromLatin1(RD::samples::kSampleParamsDlgId), sampleParams });
+        module.listDialogBind.append({ QString::fromLatin1(AA::samples::kSampleRunCmdId),
+            QString::fromLatin1(AA::samples::kSampleParamsDlgId), sampleParams });
         return module;
     }
-}  // namespace RD
+}  // namespace AA

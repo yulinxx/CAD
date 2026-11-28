@@ -10,7 +10,7 @@
 #include "Model/Assembly/AssemblyPlanner.h"
 #include "Model/Profile/ProfileParser.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -154,4 +154,4 @@ namespace RD
         m_assemblyInfo = AssemblyInfo();
         m_featureRev = 0;
     }
-}  // namespace RD
+}  // namespace AA

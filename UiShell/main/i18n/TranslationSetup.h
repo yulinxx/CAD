@@ -16,12 +16,12 @@ public:
     // 按命令行 --lang 与环境变量装载语言
     void installFromArguments();
 
-    RD::ITranslationService* service() const
+    AA::ITranslationService* service() const
     {
         return m_transService.get();
     }
 
-    RD::ITextProvider* textProvider() const
+    AA::ITextProvider* textProvider() const
     {
         return m_text.get();
     }
@@ -33,6 +33,6 @@ private:
     static QString requestedLanguage();
 
 private:
-    RD::ApiPtr<RD::ITranslationService> m_transService;
-    RD::ApiPtr<RD::IQtTextProvider> m_text;
+    AA::ApiPtr<AA::ITranslationService> m_transService;
+    AA::ApiPtr<AA::IQtTextProvider> m_text;
 };

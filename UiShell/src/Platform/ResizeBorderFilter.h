@@ -9,7 +9,7 @@
 
 #include <functional>
 
-namespace RD
+namespace AA
 {
     // 把鼠标位置映射成边缘集合；band 为像素宽度的可缩放带。
     inline Qt::Edges resizeEdgesAt(const QPoint& pos, const QSize& size, int band)
@@ -91,4 +91,4 @@ namespace RD
             return false;
         }
     };
-}  // namespace RD
+}  // namespace AA

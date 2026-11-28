@@ -37,7 +37,7 @@
 #include "UiShell/i18n/ITranslationService.h"
 #include "UiDialogs/AboutDialogs.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

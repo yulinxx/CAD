@@ -1,9 +1,9 @@
 #include "UiShell/Contract/BuildFingerprint.h"
 
-namespace RD
+namespace AA
 {
     const char* shellBuildFingerprint() noexcept
     {
         return UI_BUILD_FINGERPRINT;
     }
-}  // namespace RD
+}  // namespace AA

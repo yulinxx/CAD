@@ -8,10 +8,10 @@ class QWidget;
 
 namespace MS
 {
-    class AboutDialogFactory final : public RD::IDialogFactory
+    class AboutDialogFactory final : public AA::IDialogFactory
     {
     public:
-        RD::DialogResult openDialog(QWidget* parent, const QJsonObject& params = {}) override;
+        AA::DialogResult openDialog(QWidget* parent, const QJsonObject& params = {}) override;
     };
 }  // namespace MS
 

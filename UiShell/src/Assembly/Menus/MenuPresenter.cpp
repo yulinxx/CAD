@@ -12,7 +12,7 @@
 #include <QtGlobal>
 #include <functional>
 
-namespace RD
+namespace AA
 {
     // 默认菜单呈现器
     std::unique_ptr<IMenuPresenter> createMenuPresenter()
@@ -275,4 +275,4 @@ namespace RD
 
         return menuBar;
     }
-}  // namespace RD
+}  // namespace AA

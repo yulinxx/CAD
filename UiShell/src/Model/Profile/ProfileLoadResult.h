@@ -7,7 +7,7 @@
 #include "Model/Profile/ProfileModel.h"
 #include "UiShell/Contract/Diagnostic.h"
 
-namespace RD
+namespace AA
 {
     // 加载结果：只有没有任何 Error 时 model 才有值，Warning 不影响产出。
     // Model 层内部结构体，不跨 DLL 边界。
@@ -21,4 +21,4 @@ namespace RD
             return profileModel.has_value();
         }
     };
-}  // namespace RD
+}  // namespace AA

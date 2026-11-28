@@ -11,7 +11,7 @@
 class QBoxLayout;
 class QLayout;
 
-namespace RD
+namespace AA
 {
     // 面板（TopBar/LeftDock/CenterView/RightDock/StatusBar ...）的容器。
     // 容器只认识 PaneAreaInfo/PanelInfo 与工厂产出的 QWidget，
@@ -108,4 +108,4 @@ namespace RD
         // 由 setCenterWidget 放入的控件；clearPaneAreas 会随子区域一起销毁它。
         QWidget* m_centerWidget = nullptr;
     };
-}  // namespace RD
+}  // namespace AA

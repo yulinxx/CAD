@@ -1,6 +1,6 @@
 #include "Assembly/Widgets/WidgetFactoryRegistry.h"
 
-namespace RD
+namespace AA
 {
     void WidgetFactoryRegistry::registerFactory(const QString& factoryId, IWidgetFactory* factory)
     {
@@ -23,4 +23,4 @@ namespace RD
     {
         return new WidgetFactoryRegistry;
     }
-}  // namespace RD
+}  // namespace AA

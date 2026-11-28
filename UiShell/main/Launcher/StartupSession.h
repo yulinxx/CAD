@@ -10,7 +10,7 @@ class QMainWindow;
 class StartupSession
 {
 public:
-    explicit StartupSession(RD::IShellRuntime* runtime);
+    explicit StartupSession(AA::IShellRuntime* runtime);
 
 public:
     bool loadProfile(const QString& path);
@@ -29,5 +29,5 @@ private:
     void printDiagnostics(const QString& profilePath) const;
 
 private:
-    RD::IShellRuntime* m_shellRT = nullptr;
+    AA::IShellRuntime* m_shellRT = nullptr;
 };

@@ -1,5 +1,7 @@
 #include "RenderViewport2DAdapter.h"
 
+#include <utility>
+
 #include <QWidget>
 
 // ---- AprilUi 旧视口：只在 adapter 内部 include ----
@@ -21,6 +23,12 @@ namespace Apr
     QWidget* RenderViewport2DAdapter::widget() { return m_vp; }
 
     void RenderViewport2DAdapter::bindServices(IViewportServices& services) { m_services = &services; }
+
+    void RenderViewport2DAdapter::setPositionCallback(PositionCallback callback)
+    {
+        if (m_vp)
+            m_vp->setPositionCallback(std::move(callback));
+    }
 
     void RenderViewport2DAdapter::resetView() { if (m_vp) m_vp->resetView(); }
     void RenderViewport2DAdapter::zoomToSelection() { if (m_vp) m_vp->zoomToSelection(); }

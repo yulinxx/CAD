@@ -5,7 +5,7 @@
 namespace GL
 {
     // 命令表
-    class Commands final : public RD::CommandTable
+    class Commands final : public AA::CommandTable
     {
     public:
         Commands();

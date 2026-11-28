@@ -4,7 +4,7 @@
 #include "Model/Assembly/AssemblyInfo.h"
 #include "Model/Profile/ProfileModel.h"
 
-namespace RD
+namespace AA
 {
     class ICommandCatalog;
     class ITextProvider;
@@ -13,4 +13,4 @@ namespace RD
         const FeatureFlagSet& flags,
         const ICommandCatalog* catalog = nullptr,
         const ITextProvider* text = nullptr);
-}  // namespace RD
+}  // namespace AA

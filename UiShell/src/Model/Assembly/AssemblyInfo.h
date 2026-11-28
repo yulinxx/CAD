@@ -8,7 +8,7 @@
 #include "Model/Spec/RegionType.h"
 #include "Model/Profile/ProfileModel.h"
 
-namespace RD
+namespace AA
 {
     // 子区域信息：区域内的一个位置，描述尺寸与伸缩策略
     struct PaneAreaInfo
@@ -129,4 +129,4 @@ namespace RD
             return key;
         }
     };
-}  // namespace RD
+}  // namespace AA

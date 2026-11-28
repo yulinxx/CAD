@@ -13,7 +13,7 @@ class QMouseEvent;
 class QPaintEvent;
 class QToolButton;
 
-namespace RD
+namespace AA
 {
     // 标题栏视图：依赖 QtWidgets + TitleBarSpec + ITitleBarHost，
     // 只负责绘制与把意图交给宿主
@@ -117,4 +117,4 @@ namespace RD
         QToolButton* m_maximizeButton = nullptr;
         QToolButton* m_closeButton = nullptr;
     };
-}  // namespace RD
+}  // namespace AA

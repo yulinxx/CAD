@@ -159,7 +159,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   - `CustomerModule.cpp`：`createCustomerModule()` + `customerBuildFingerprint()`；
     `strId=april`、`strDisplayName=April`、`strProfilePath=:/UiApril/profile/ui.json`；
     `Q_INIT_RESOURCE(UiAprilProfile)`（静态链接兜底）；`centerView` 指向本客户实现。
-  - `panels/PanelFactory.*`：`CenterView : RD::ICenterViewProvider`，M2 返回空 `QWidget`；
+  - `panels/PanelFactory.*`：`CenterView : AA::ICenterViewProvider`，M2 返回空 `QWidget`；
     **M3** 改为返回现有 CAD 工作台/视口宿主。
   - `ui.json`：version 2 最小集（titlebar / menubar / CenterView / StatusBar）。
 - `UiProjectDefaults.cmake`：`UI_CUSTOMER` 增加 `April`；`UI_CUSTOMER_TARGET=UiApril`；
@@ -191,7 +191,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 **做法**（`UiShell/customers/April`）：
 
 - 新增 `panels/AprilWorkbench.{h,cpp}`：
-  - `AprilWorkbench : RD::ICenterViewProvider`；
+  - `AprilWorkbench : AA::ICenterViewProvider`；
   - `createCenterView()` → `createCenterView2D` / `createCenterView3D`：
     - **2D**：返回现有 `RenderViewport2D`（`Main/Src/UI/Render/RenderViewport2D.h`，`AprilUi`），
       注入 `setDocument` / `setSelectionService` / `setOperationBus` / `setLayerManager`，
@@ -203,7 +203,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   - 视口所需服务由 `customers/April` 持有并注入：
     `UiServices`（七分组装配容器，`setUiServices` 同步 `workbench()`）、`WorkbenchServices`、
     `SceneDocument2D`、`SceneDocument3D`、`UiStateCenter`、`OperationBus`、`ISelectionService`、`LayerManager`、`CameraController3D`；
-  - 与 `UiShell` 的 `RD::ShellServices` 互转：`populateShellServices()` / `applyShellServices()`；
+  - 与 `UiShell` 的 `AA::ShellServices` 互转：`populateShellServices()` / `applyShellServices()`；
   - 不重写工作台，复用 `AprilUi` 现有实现。
 - `PanelFactory.h`：`CenterView : public AprilWorkbench`（M2 空 `QWidget` 已替换为 M3 视口宿主）。
 - `CustomerModule.cpp`：`module.centerView` 指向 `CenterView`（即 `AprilWorkbench`）。
@@ -233,10 +233,10 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 
 **做法**（`UiShell/customers/April`）：
 
-- 新增 `commands/Commands.{h,cpp}`：`Apr::Commands : RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState`
+- 新增 `commands/Commands.{h,cpp}`：`Apr::Commands : AA::ICommandCatalog + AA::ICommandInvoker + AA::ICommandState`
   - `find()`；`invoke()` → `ICommandSink::dispatch(commandId, {})`；
     `invokeWithArgs()` → `dispatch(commandId, QJsonObject→QVariantMap)`（透传/补齐，不整体覆盖）；
-  - `queryState()` → `isCommandRegistered` → `bEnabled`；`addCommand(RD::CommandView)`；`setSink()`；
+  - `queryState()` → `isCommandRegistered` → `bEnabled`；`addCommand(AA::CommandView)`；`setSink()`；
   - **不重写命令系统**，复用 `CommandCatalog` / `OperationRouting` / `OperationBus` / `OperationRegistry`。
     M6 后生产路径不再经过旧 `IUiCommandDispatcher`。
 - `CustomerModule.cpp`：`ModuleParts` 持有 `Commands commands`；`module.cmdCatalog/cmdInvoker/cmdState = &parts->commands`。
@@ -248,7 +248,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   会把菜单命令当“未知命令”剔除。新增 `UiTstAprilMenuCatalog` 单测校验嵌套菜单、元数据、
   去重，以及**随附 ui.json 的每个菜单命令都能在目录里找到**；实测完整 profile 启动
   的 unknown-command 警告为 0。
-- **外置 profile 同步**：契约新增可选 `RD::ICommandProfileRegistrar`，`ProfilePipeline::loadFromJson()`
+- **外置 profile 同步**：契约新增可选 `AA::ICommandProfileRegistrar`，`ProfilePipeline::loadFromJson()`
   在规划前调用它；四套客户的 `Commands` 均已实现（April 复用 `addCommandsFromProfile()`，
   其余继承 `CommandTable` 的默认实现）。因此 `--profile` 指向的站点 ui.json 即使引入新命令 id，
   目录也会在加载时补齐，无需重编或改客户代码。新增 `UiTstProfileCommands` 验证“有/无登记钩子”
@@ -348,7 +348,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 
 - `UiShell` core + `UiLayerCheck`：不依赖 `Main/April*`；customer 唯一差异 `customers/<X>`。
 - `UiContract` 纯接口；`UiShell` 不知道 customer。
-- `AprilCore`(算法) 不链 `UiShell`；UI 经 `RD::ICommand*` + `Apr::ICadViewport` + `Apr::IViewportServices` + `OperationBus`/`SceneDocument2D` 契约，不直接改 `SceneManager`。
+- `AprilCore`(算法) 不链 `UiShell`；UI 经 `AA::ICommand*` + `Apr::ICadViewport` + `Apr::IViewportServices` + `OperationBus`/`SceneDocument2D` 契约，不直接改 `SceneManager`。
 - `Apr::IViewportFactory` + `Apr::RenderViewport2DAdapter`(2D) + `Apr::Viewport3DAdapter`(3D) + `Apr::CompositionRootAdapter`；旧 `RenderViewport2D`/`Viewport3D`/`ApplicationCompositionRoot` 关进 adapter。
 - `customers/April` 唯一耦合 `AprilUi`/`AprilCore`；`UiShell` 不见。
 - `AprilShell` 与 M6 后的 `April` 都不依赖 `Main::AppBootstrapper`（已删除）。

@@ -5,7 +5,7 @@
 
 #include "UiShell/Contract/DialogRegistry.h"
 
-namespace RD::about
+namespace AA::about
 {
     // 关于对话框
     inline constexpr const char* kAboutDlgId = "dialog.about";
@@ -13,7 +13,7 @@ namespace RD::about
 
     namespace Param
     {
-        // 与 RD::DialogParam 共用品牌字段名，避免 profile 注入与对话框解析漂移。
+        // 与 AA::DialogParam 共用品牌字段名，避免 profile 注入与对话框解析漂移。
         constexpr const char* Title = "title";
         constexpr const char* Product = DialogParam::Product;
         constexpr const char* Version = "version";
@@ -97,4 +97,4 @@ namespace RD::about
     public:
         DialogResult openDialog(QWidget* parent, const QJsonObject& params = {}) override;
     };
-}  // namespace RD::about
+}  // namespace AA::about

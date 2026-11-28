@@ -14,21 +14,21 @@
 #include "UiShell/i18n/ITranslationService.h"
 
 // 跨模块对象只能经 destroy() / ApiPtr 释放：析构函数必须不可公开访问（对接口指针写 delete 编译不过）。
-static_assert(!std::is_destructible<RD::IApiObject>::value, "IApiObject must not be deletable");
-static_assert(!std::is_destructible<RD::IShellRuntime>::value, "IShellRuntime must not be deletable");
-static_assert(!std::is_destructible<RD::IDialogFactoryRegistry>::value, "IDialogFactoryRegistry must not be deletable");
-static_assert(!std::is_destructible<RD::IWidgetFactoryRegistry>::value, "IWidgetFactoryRegistry must not be deletable");
-static_assert(!std::is_destructible<RD::IFeatureFlagStore>::value, "IFeatureFlagStore must not be deletable");
-static_assert(!std::is_destructible<RD::ITitleBarView>::value, "ITitleBarView must not be deletable");
-static_assert(!std::is_destructible<RD::ITranslationService>::value, "ITranslationService must not be deletable");
-static_assert(!std::is_destructible<RD::IQtTextProvider>::value, "IQtTextProvider must not be deletable");
+static_assert(!std::is_destructible<AA::IApiObject>::value, "IApiObject must not be deletable");
+static_assert(!std::is_destructible<AA::IShellRuntime>::value, "IShellRuntime must not be deletable");
+static_assert(!std::is_destructible<AA::IDialogFactoryRegistry>::value, "IDialogFactoryRegistry must not be deletable");
+static_assert(!std::is_destructible<AA::IWidgetFactoryRegistry>::value, "IWidgetFactoryRegistry must not be deletable");
+static_assert(!std::is_destructible<AA::IFeatureFlagStore>::value, "IFeatureFlagStore must not be deletable");
+static_assert(!std::is_destructible<AA::ITitleBarView>::value, "ITitleBarView must not be deletable");
+static_assert(!std::is_destructible<AA::ITranslationService>::value, "ITranslationService must not be deletable");
+static_assert(!std::is_destructible<AA::IQtTextProvider>::value, "IQtTextProvider must not be deletable");
 // shell 持有、调用方只借用的接口：同样不可 delete。
-static_assert(!std::is_destructible<RD::IShellHost>::value, "IShellHost is borrowed, not owned");
-static_assert(!std::is_destructible<RD::IRegionContainer>::value, "IRegionContainer is borrowed, not owned");
-static_assert(!std::is_destructible<RD::IFeatureFlagObserver>::value, "observer is not owned by the store");
-static_assert(!std::is_destructible<RD::IShellListener>::value, "listener is not owned by the shell");
+static_assert(!std::is_destructible<AA::IShellHost>::value, "IShellHost is borrowed, not owned");
+static_assert(!std::is_destructible<AA::IRegionContainer>::value, "IRegionContainer is borrowed, not owned");
+static_assert(!std::is_destructible<AA::IFeatureFlagObserver>::value, "observer is not owned by the store");
+static_assert(!std::is_destructible<AA::IShellListener>::value, "listener is not owned by the shell");
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

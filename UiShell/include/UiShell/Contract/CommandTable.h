@@ -15,7 +15,7 @@
 
 #include "UiShell/Contract/Command.h"
 
-namespace RD
+namespace AA
 {
     // 命令表
     class CommandTable : public ICommandCatalog,
@@ -211,4 +211,4 @@ namespace RD
         QHash<QString, int> m_index;
         int m_last = -1;
     };
-}  // namespace RD
+}  // namespace AA

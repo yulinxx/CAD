@@ -20,6 +20,7 @@ namespace Apr
         QWidget* widget() override;
         void bindServices(IViewportServices& services) override;
         IViewportServices* services() const { return m_services; }
+        void setPositionCallback(PositionCallback callback) override;
         void resetView() override;
         void zoomToSelection() override;
         void setDrawingEnabled(bool enabled) override;

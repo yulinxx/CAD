@@ -10,7 +10,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class IWindowFrame
     {
@@ -41,4 +41,4 @@ namespace RD
     };
 
     UI_SHELL_API std::unique_ptr<IWindowFrame> createWindowFrame();
-}  // namespace RD
+}  // namespace AA

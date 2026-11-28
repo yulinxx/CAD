@@ -4,7 +4,7 @@
 #include "ProfileParser.h"
 #include "ProfileValidator.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -43,4 +43,4 @@ namespace RD
     {
         return new ProfileLoader;
     }
-}  // namespace RD
+}  // namespace AA

@@ -9,7 +9,7 @@
 
 #include "UiShell/Contract/IShellHost.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -127,4 +127,4 @@ namespace RD
 
         return toolBar;
     }
-}  // namespace RD
+}  // namespace AA

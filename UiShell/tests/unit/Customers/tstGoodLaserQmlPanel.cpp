@@ -8,7 +8,7 @@
 #include "qml/QmlPanelWidget.h"
 #include "UiShell/Contract/HostContext.h"
 
-using namespace RD;
+using namespace AA;
 using GL::QmlPanelWidget;
 
 namespace

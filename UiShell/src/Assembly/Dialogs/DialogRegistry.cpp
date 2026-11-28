@@ -2,7 +2,7 @@
 
 #include <QtGlobal>
 
-namespace RD
+namespace AA
 {
     void DialogRegistry::registerFactory(const QString& dialogId, IDialogFactory* factory)
     {
@@ -33,4 +33,4 @@ namespace RD
     {
         return new DialogRegistry;
     }
-}  // namespace RD
+}  // namespace AA

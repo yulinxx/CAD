@@ -16,7 +16,7 @@
 #include "UiShell/Titlebar/ITitleBarMenuHost.h"
 #include "UiShell/Titlebar/ITitleBarView.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

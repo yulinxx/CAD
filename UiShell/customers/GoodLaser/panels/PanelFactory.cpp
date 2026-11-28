@@ -8,14 +8,14 @@
 
 namespace GL
 {
-    QWidget* PanelFactory::create(const RD::PanelCreateRequest& info)
+    QWidget* PanelFactory::create(const AA::PanelCreateRequest& info)
     {
         // 面板用 QML
         const bool isStatus = (info.strPanelId == QLatin1String("status"));
         auto* panel = new QmlPanelWidget(info.context, info.strPanelId, info.parent);
         panel->setObjectName(QStringLiteral("panel:") + info.strPanelId);
 
-        RD::markPanel(panel,
+        AA::markPanel(panel,
             isStatus ? QStringLiteral("panelStatus") : QStringLiteral("panel"),
             QStringLiteral("goodlaser"));
 
@@ -26,12 +26,12 @@ namespace GL
 
     QWidget* CenterView::createCenterView(QWidget* parent)
     {
-        auto* view = new QmlPanelWidget(RD::HostContext(),
+        auto* view = new QmlPanelWidget(AA::HostContext(),
             QStringLiteral("center"), parent);
         view->setObjectName(QStringLiteral("center.view"));
         view->setMinimumSize(420, 300);
 
-        RD::markPanel(view, QStringLiteral("centerView"), QStringLiteral("goodlaser"));
+        AA::markPanel(view, QStringLiteral("centerView"), QStringLiteral("goodlaser"));
         return view;
     }
 }  // namespace GL

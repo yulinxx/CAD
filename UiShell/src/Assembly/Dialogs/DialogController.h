@@ -7,7 +7,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     struct ShellServices;
 
@@ -30,4 +30,4 @@ namespace RD
         const ShellServices* m_shellServices = nullptr;
         const QString* m_strProfileDir = nullptr;
     };
-}  // namespace RD
+}  // namespace AA

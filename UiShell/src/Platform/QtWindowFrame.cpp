@@ -5,7 +5,7 @@
 
 #include "Platform/ResizeBorderFilter.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -107,4 +107,4 @@ namespace RD
     {
         return std::unique_ptr<IWindowFrame>(new QtWindowFrame());
     }
-}  // namespace RD
+}  // namespace AA

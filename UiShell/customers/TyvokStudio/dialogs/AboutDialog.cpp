@@ -30,20 +30,20 @@ namespace TS
             Mail
         };
 
-        // 信息表的一行：params 键（也用作 objectName 后缀）、已登记翻译的标签、RD::about::AboutDlgData 字段、显示方式。
+        // 信息表的一行：params 键（也用作 objectName 后缀）、已登记翻译的标签、AA::about::AboutDlgData 字段、显示方式。
         struct DetailRow
         {
             const char* key;
             const char* label;
-            QString RD::about::AboutDlgData::* field;
+            QString AA::about::AboutDlgData::* field;
             RowKind kind;
         };
 
         const DetailRow kDetailRows[] = {
-            { RD::about::Param::Company, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Company"), &RD::about::AboutDlgData::company, RowKind::Text },
-            { RD::about::Param::Copyright, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Copyright"), &RD::about::AboutDlgData::copyright, RowKind::Text },
-            { RD::about::Param::Website, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Website"), &RD::about::AboutDlgData::website, RowKind::Web },
-            { RD::about::Param::Email, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Email"), &RD::about::AboutDlgData::email, RowKind::Mail },
+            { AA::about::Param::Company, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Company"), &AA::about::AboutDlgData::company, RowKind::Text },
+            { AA::about::Param::Copyright, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Copyright"), &AA::about::AboutDlgData::copyright, RowKind::Text },
+            { AA::about::Param::Website, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Website"), &AA::about::AboutDlgData::website, RowKind::Web },
+            { AA::about::Param::Email, QT_TRANSLATE_NOOP("TyvokStudioAbout", "Email"), &AA::about::AboutDlgData::email, RowKind::Mail },
         };
 
         QString objectNameFor(const char* key)
@@ -52,7 +52,7 @@ namespace TS
         }
 
         // 版本行：版本号与日期按有无组合成一句。
-        QString versionLine(const RD::about::AboutDlgData& info)
+        QString versionLine(const AA::about::AboutDlgData& info)
         {
             if (!info.version.isEmpty() && !info.versionDate.isEmpty())
                 return QCoreApplication::translate("TyvokStudioAbout", "Version %1 (%2)").arg(info.version, info.versionDate);
@@ -142,7 +142,7 @@ namespace TS
         }
     }  // namespace
 
-    AboutDialog::AboutDialog(const RD::about::AboutDlgData& info, QWidget* parent)
+    AboutDialog::AboutDialog(const AA::about::AboutDlgData& info, QWidget* parent)
         : QDialog(parent)
         , m_info(info)
     {

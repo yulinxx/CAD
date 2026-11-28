@@ -2,7 +2,7 @@
 
 #include "UiShell/Assembly/ActiveRuntime.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -29,4 +29,4 @@ namespace RD
     {
         return g_activeRuntime;
     }
-}  // namespace RD
+}  // namespace AA

@@ -5,7 +5,7 @@
 #include <QHash>
 #include <QMutex>
 
-namespace RD
+namespace AA
 {
     // 功能开关仓库
     class FeatureFlagStore : public QObject, public IFeatureFlagStore
@@ -44,4 +44,4 @@ namespace RD
         quint64 m_nextSubscriptionId = 1;
         QHash<quint64, IFeatureFlagObserver*> m_subscriptions;  // 不持有观察者
     };
-}  // namespace RD
+}  // namespace AA

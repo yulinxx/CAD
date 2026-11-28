@@ -9,7 +9,7 @@
 #include "UiShell/Contract/IApiObject.h"
 #include "UiShell/Contract/WidgetFactory.h"
 
-namespace RD
+namespace AA
 {
     class ICommandCatalog;
     class ICommandInvoker;
@@ -82,4 +82,4 @@ namespace RD
     };
 
     UI_CUSTOMER_API CustomerModule createCustomerModule();
-}  // namespace RD
+}  // namespace AA

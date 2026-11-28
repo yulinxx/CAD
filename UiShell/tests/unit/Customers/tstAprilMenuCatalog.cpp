@@ -77,7 +77,7 @@ void AprilMenuCatalogTest::registersNestedMenuCommandsWithMetadata()
     Apr::Commands commands;
     QCOMPARE(commands.addCommandsFromProfile(json), 2);
 
-    const RD::CommandView* first = commands.find(QStringLiteral("file.new"));
+    const AA::CommandView* first = commands.find(QStringLiteral("file.new"));
     QVERIFY(first != nullptr);
     QCOMPARE(first->strTitleKey, QStringLiteral("New"));
     QCOMPARE(first->strIconKey, QStringLiteral(":/new.svg"));
@@ -129,9 +129,9 @@ void AprilMenuCatalogTest::interfaceRegistersExternalProfileCommand()
     })";
 
     Apr::Commands commands;
-    RD::ICommandProfileRegistrar* registrar = &commands;
+    AA::ICommandProfileRegistrar* registrar = &commands;
     QCOMPARE(registrar->registerFromProfile(json), 1);
-    const RD::CommandView* view = commands.find(QStringLiteral("site.external.command"));
+    const AA::CommandView* view = commands.find(QStringLiteral("site.external.command"));
     QVERIFY(view != nullptr);
     QCOMPARE(view->strTitleKey, QStringLiteral("Site command"));
     QCOMPARE(registrar->registerFromProfile(json), 0);

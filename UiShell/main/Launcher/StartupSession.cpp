@@ -31,7 +31,7 @@ namespace
     }
 }  // namespace
 
-StartupSession::StartupSession(RD::IShellRuntime* runtime)
+StartupSession::StartupSession(AA::IShellRuntime* runtime)
     : m_shellRT(runtime)
 {
 }
@@ -116,12 +116,12 @@ void StartupSession::printDiagnostics(const QString& profilePath) const
         return;
 
     const QString file = QDir::toNativeSeparators(profilePath);
-    for (const RD::Diagnostic& d : m_shellRT->diagnostics())
+    for (const AA::Diagnostic& d : m_shellRT->diagnostics())
     {
         const char* severity = "info";
-        if (d.level == RD::Diagnostic::Level::Error)
+        if (d.level == AA::Diagnostic::Level::Error)
             severity = "error";
-        else if (d.level == RD::Diagnostic::Level::Warning)
+        else if (d.level == AA::Diagnostic::Level::Warning)
             severity = "warning";
 
         QString where = d.strJsonPath;

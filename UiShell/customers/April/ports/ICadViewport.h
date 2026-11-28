@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #include <QString>
 #include <QWidget>
 
@@ -20,6 +22,11 @@ namespace Apr
         // 由 AprilWorkbench 通过 port 注入服务视图；adapter 可用它转发 UI 意图到算法层。
         // 默认空实现，只有需要抽象服务的 adapter 才 override。
         virtual void bindServices(IViewportServices&) {}
+
+        using PositionCallback = std::function<void(double, double)>;
+
+        // 鼠标世界坐标回调：默认空实现，只有支持坐标反馈的视口才 override。
+        virtual void setPositionCallback(PositionCallback) {}
 
         // UI 意图 -> 算法层（不暴露 SceneManager/SceneDocument2D）
         virtual void resetView() = 0;

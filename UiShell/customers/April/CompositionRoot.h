@@ -10,6 +10,7 @@ namespace Apr
 {
     class AprilWorkbench;
     class Commands;
+    class DrawToolSwitchRegistry;
     class ICommandSink;
     class OperationCommandSink;
 
@@ -34,7 +35,8 @@ namespace Apr
                              AprilWorkbench& workbench,
                              Commands& commands,
                              CompositionRootAdapter& adapter,
-                             OperationCommandSink& sink);
+                             OperationCommandSink& sink,
+                             DrawToolSwitchRegistry& toolSwitchRegistry);
 
     // 低耦合：UiShell 不知道 Main。customers/April 自己提供命令出口并注入 Commands。
     // 传 nullptr 可清空。不要求 ApplicationCompositionRoot::instance()->isBuilt()。
@@ -48,5 +50,6 @@ namespace Apr
                                Commands& commands,
                                CompositionRootWiring& wiring,
                                OperationCommandSink& sink,
+                               DrawToolSwitchRegistry& toolSwitchRegistry,
                                ApplicationCompositionRoot* existing = nullptr);
 }  // namespace Apr

@@ -3,6 +3,7 @@
 #include <QAction>
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QPointer>
 #include <QStringList>
 #include <QToolBar>
 #include <QVector>
@@ -64,7 +65,7 @@ namespace
         return commands;
     }
 
-    QWidget* createDrawToolBar(const RD::PanelCreateRequest& info)
+    QWidget* createDrawToolBar(const AA::PanelCreateRequest& info)
     {
         auto* bar = new DrawToolBarWidget(info.parent);
         bar->setObjectName(QStringLiteral("panel:") + info.strPanelId);
@@ -121,7 +122,7 @@ namespace
         return bar;
     }
 
-    QWidget* createTopToolBar(const RD::PanelCreateRequest& info)
+    QWidget* createTopToolBar(const AA::PanelCreateRequest& info)
     {
         auto* bar = new TopToolBar(info.parent);
         bar->setObjectName(QStringLiteral("panel:") + info.strPanelId);
@@ -146,7 +147,7 @@ namespace
 
 namespace Apr
 {
-    QWidget* PanelFactory::create(const RD::PanelCreateRequest& info)
+    QWidget* PanelFactory::create(const AA::PanelCreateRequest& info)
     {
         QWidget* parent = info.parent;
         const QString id = info.strPanelId;
@@ -183,11 +184,19 @@ namespace Apr
             return props;
         }
 
-        // 旧状态栏（UI2D）
+        // 旧状态栏（UI2D）：坐标 sink 由客户 workbench 持有，视口刷新后仍然有效。
         if (id == QLatin1String("status"))
         {
             auto* bar = new StatusBar(parent);
             bar->setObjectName(QStringLiteral("panel:") + id);
+            if (m_workbench)
+            {
+                QPointer<StatusBar> weakBar = bar;
+                m_workbench->setPositionSink([weakBar](double x, double y) {
+                    if (StatusBar* statusBar = weakBar.data())
+                        statusBar->setPositionValues(x, y, QStringLiteral("mm"), true);
+                });
+            }
             return bar;
         }
 

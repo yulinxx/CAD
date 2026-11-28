@@ -27,7 +27,7 @@ namespace MS
     //     - 其余绘图/编辑工具统一映射到 Commands 已登记的命令 id，经 IShellHost 调用；
     //       工具栏本身不实现任何业务逻辑。
 
-    LeftSidePanel::LeftSidePanel(RD::IShellHost* host, QWidget* parent)
+    LeftSidePanel::LeftSidePanel(AA::IShellHost* host, QWidget* parent)
         : QWidget(parent)
         , m_host(host)
     {

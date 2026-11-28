@@ -26,12 +26,12 @@ namespace GL
         const char* const kSampleQmlSource = "qrc:/GoodLaser/SampleDialog.qml";
     }  // namespace
 
-    RD::DialogResult GoodLaserSampleDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
+    AA::DialogResult GoodLaserSampleDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
-        RD::samples::SampleParams values = RD::samples::SampleParams::fromJson(params);
+        AA::samples::SampleParams values = AA::samples::SampleParams::fromJson(params);
         values.method = QStringLiteral("newton");
 
-        auto* dialog = RD::markDialog(new QDialog(parent), params);  // 品牌色来自 params 里的系列
+        auto* dialog = AA::markDialog(new QDialog(parent), params);  // 品牌色来自 params 里的系列
         dialog->setObjectName(QStringLiteral("GoodLaser.sample.dialog"));
         dialog->setWindowTitle(QCoreApplication::translate("GoodLaserSample", "Sample algorithm (Good Laser)"));
         dialog->setModal(true);
@@ -94,7 +94,7 @@ namespace GL
             qWarning().noquote() << "GoodLaser: Sample dialog QML failed to load:"
                 << (errors.isEmpty() ? "QML root object was not created" : errors.join(QLatin1Char('\n')));
 
-            return RD::DialogResult{};
+            return AA::DialogResult{};
         }
 
         // 尺寸
@@ -121,8 +121,8 @@ namespace GL
         }
 
         auto* rootGuard = root;
-        return RD::runModalDialog(dialog, [values, rootGuard](QDialog*) {
-            RD::samples::SampleParams collected = values;
+        return AA::runModalDialog(dialog, [values, rootGuard](QDialog*) {
+            AA::samples::SampleParams collected = values;
 
             const QVariant targetVar = rootGuard->property("targetValue");
             const QVariant iterVar = rootGuard->property("iterationsValue");

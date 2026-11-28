@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -157,4 +157,4 @@ namespace RD
         if (column)
             *column = c;
     }
-}  // namespace RD
+}  // namespace AA

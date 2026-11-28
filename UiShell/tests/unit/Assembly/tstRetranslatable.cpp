@@ -6,7 +6,7 @@
 
 #include "UiShell/Contract/Retranslatable.h"
 
-using namespace RD;
+using namespace AA;
 
 // 三个客户原先各有一份 Retranslatable/markPanel；下沉到 contract 后
 // 这里锁住公共语义：回调按注册顺序执行、角色/系列写入稳定属性。

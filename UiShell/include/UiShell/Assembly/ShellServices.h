@@ -10,7 +10,7 @@
 #include "UiShell/Contract/ITextProvider.h"
 #include "UiShell/Contract/WidgetFactory.h"
 
-namespace RD
+namespace AA
 {
     class ITranslationService;
 
@@ -72,4 +72,4 @@ namespace RD
         // 皮肤样式
         QString strStyleSeries;
     };
-}  // namespace RD
+}  // namespace AA

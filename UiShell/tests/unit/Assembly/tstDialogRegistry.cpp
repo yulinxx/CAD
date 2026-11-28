@@ -7,7 +7,7 @@
 
 #include "UiShell/Contract/DialogRegistry.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

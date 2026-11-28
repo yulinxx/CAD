@@ -8,7 +8,7 @@
 
 class QTranslator;
 
-namespace RD
+namespace AA
 {
     // 基于 Qt 原生 QTranslator 的翻译装载器：只负责 .qm 的装载/卸载与回退，
     // 不保存任何 key → 文案的映射（文案全部在每个 DLL 自己的 .ts 里）。
@@ -39,8 +39,8 @@ namespace RD
         QStringList builtinLanguages() const override;
 
         // "en" / "en-US" / "EN_us" → en_US；"zh-Hans" / "zh_TW" → zh_CN；
-        // ja / ko / ru / de 同理；空 → 空（表示“未指定，跟随系统”）；
-        // 其他语言原样保留（是否可用由对应 .qm 是否存在决定）。
+        // ja / ko / fr / de / es / pt / ru / ar / it / hi / tr / vi 同理；
+        // 空 → 空（表示“未指定，跟随系统”）；其他语言原样保留。
         QString normalizeLanguageId(const QString& id) const override;
 
         // 是否为内置支持的语言（归一化后比较）。
@@ -74,6 +74,8 @@ namespace RD
     private:
         // 装载某个语言下所有模块 .qm；shell 必须存在，其余尽力装载
         int loadLanguage(const QString& lang);
+        // 只按给定文件名后缀装载；loadLanguage() 会再尝试该语言的短码别名。
+        int loadLanguageFiles(const QString& lang);
 
         // 装载单个 .qm 文件；失败返回 false 且不改变已装载列表。
         bool loadFile(const QString& path);
@@ -86,4 +88,4 @@ namespace RD
         QString m_lastError;
         QStringList m_loadedFiles;
     };
-}  // namespace RD
+}  // namespace AA

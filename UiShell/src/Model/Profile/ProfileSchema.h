@@ -1,6 +1,6 @@
 #pragma once
 
-namespace RD
+namespace AA
 {
     // 版本
     inline constexpr int kProfileVersion = 2;
@@ -16,4 +16,4 @@ namespace RD
         inline constexpr int maxMenuDepth = 16;    // 顶层节点深度为 0
         inline constexpr int maxMenuNodes = 1024;  // 所有菜单节点总和
     }  // namespace ProfileLimits
-}  // namespace RD
+}  // namespace AA

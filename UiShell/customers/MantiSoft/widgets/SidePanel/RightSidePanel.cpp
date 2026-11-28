@@ -20,7 +20,7 @@ namespace MS
     //   - 至少一个子面板 visible → RightToolWidget show → 整体变宽 → 挤中央；
     //   - 全部子面板隐藏       → RightToolWidget hide → 只有 40px 工具栏 → 中央占满。
 
-    RightSidePanel::RightSidePanel(RD::IShellHost* host, QWidget* parent)
+    RightSidePanel::RightSidePanel(AA::IShellHost* host, QWidget* parent)
         : QWidget(parent)
         , m_host(host)
     {

@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace RD::samples
+namespace AA::samples
 {
     QStringList sampleMethods()
     {
@@ -109,4 +109,4 @@ namespace RD::samples
         result.value = x;
         return result;
     }
-}  // namespace RD::samples
+}  // namespace AA::samples

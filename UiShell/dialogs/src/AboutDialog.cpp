@@ -9,7 +9,7 @@
 #include <QSize>
 #include <QVBoxLayout>
 
-namespace RD::about
+namespace AA::about
 {
     namespace
     {
@@ -97,4 +97,4 @@ namespace RD::about
         connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
         layout->addWidget(buttons);
     }
-}  // namespace RD::about
+}  // namespace AA::about

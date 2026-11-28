@@ -5,7 +5,7 @@
 
 #include "UiShell/Contract/DialogRegistry.h"
 
-namespace RD
+namespace AA
 {
     // 对话框注册
     class DialogRegistry final : public IDialogFactoryRegistry
@@ -21,4 +21,4 @@ namespace RD
     private:
         QHash<QString, IDialogFactory*> m_dialogs;
     };
-}  // namespace RD
+}  // namespace AA

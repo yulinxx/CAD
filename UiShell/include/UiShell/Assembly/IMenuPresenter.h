@@ -11,7 +11,7 @@
 #include <QIcon>
 #include <vector>
 
-namespace RD
+namespace AA
 {
     class ICommandCatalog;
     class ITextProvider;
@@ -33,4 +33,4 @@ namespace RD
 
     // 创建默认菜单
     UI_SHELL_API std::unique_ptr<IMenuPresenter> createMenuPresenter();
-}  // namespace RD
+}  // namespace AA

@@ -41,9 +41,9 @@ namespace GL
         }
 
         // 翻译数据
-        RD::about::AboutDlgData makeAboutData()
+        AA::about::AboutDlgData makeAboutData()
         {
-            RD::about::AboutDlgData data;
+            AA::about::AboutDlgData data;
             data.product = QCoreApplication::translate("about", "about.c.product");
             data.version = QStringLiteral("2.0.0");
             data.company = QCoreApplication::translate("about", "about.c.company");
@@ -52,7 +52,7 @@ namespace GL
         }
 
         // params → QML 的 about 对象
-        QVariantMap buildView(const RD::about::AboutDlgData& info, const QJsonObject& params)
+        QVariantMap buildView(const AA::about::AboutDlgData& info, const QJsonObject& params)
         {
             QVariantMap view;
             view.insert(QStringLiteral("windowTitle"),
@@ -71,33 +71,33 @@ namespace GL
             view.insert(QStringLiteral("closeText"), QCoreApplication::translate("GoodLaserAbout", "Close"));
 
             // 皮肤
-            const bool dark = params.value(QString::fromLatin1(RD::DialogParam::Theme)).toString() == QLatin1String(RD::ThemeId::Dark);
-            view.insert(QStringLiteral("theme"), QString::fromLatin1(dark ? RD::ThemeId::Dark : RD::ThemeId::Light));
+            const bool dark = params.value(QString::fromLatin1(AA::DialogParam::Theme)).toString() == QLatin1String(AA::ThemeId::Dark);
+            view.insert(QStringLiteral("theme"), QString::fromLatin1(dark ? AA::ThemeId::Dark : AA::ThemeId::Light));
 
             QVariantList rows;
             if (!info.versionDate.isEmpty())
-                rows.append(row(RD::about::Param::VersionDate, QCoreApplication::translate("GoodLaserAbout", "Released"), info.versionDate));
+                rows.append(row(AA::about::Param::VersionDate, QCoreApplication::translate("GoodLaserAbout", "Released"), info.versionDate));
 
             if (!info.company.isEmpty())
-                rows.append(row(RD::about::Param::Company, QCoreApplication::translate("GoodLaserAbout", "Company"), info.company));
+                rows.append(row(AA::about::Param::Company, QCoreApplication::translate("GoodLaserAbout", "Company"), info.company));
 
             if (!info.copyright.isEmpty())
-                rows.append(row(RD::about::Param::Copyright, QCoreApplication::translate("GoodLaserAbout", "Copyright"), info.copyright));
+                rows.append(row(AA::about::Param::Copyright, QCoreApplication::translate("GoodLaserAbout", "Copyright"), info.copyright));
 
             if (!info.website.isEmpty())
             {
-                rows.append(row(RD::about::Param::Website, QCoreApplication::translate("GoodLaserAbout", "Website"),
+                rows.append(row(AA::about::Param::Website, QCoreApplication::translate("GoodLaserAbout", "Website"),
                     info.website, websiteLink(info.website)));
             }
 
             if (!info.email.isEmpty())
             {
-                rows.append(row(RD::about::Param::Email, QCoreApplication::translate("GoodLaserAbout", "Email"),
+                rows.append(row(AA::about::Param::Email, QCoreApplication::translate("GoodLaserAbout", "Email"),
                     info.email, QStringLiteral("mailto:") + info.email));
             }
 
             if (!info.license.isEmpty())
-                rows.append(row(RD::about::Param::License, QCoreApplication::translate("GoodLaserAbout", "License"), info.license));
+                rows.append(row(AA::about::Param::License, QCoreApplication::translate("GoodLaserAbout", "License"), info.license));
 
             // GoodLaser 专属的两行说明。
             rows.append(row("diagnostics", QString(),
@@ -111,21 +111,21 @@ namespace GL
         }
     }  // namespace
 
-    RD::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
+    AA::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
-        RD::about::AboutDlgData info = makeAboutData();
+        AA::about::AboutDlgData info = makeAboutData();
         info.applyParams(params); 
 
-        auto* dialog = RD::markDialog(new AboutDialog(buildView(info, params), parent), params);
+        auto* dialog = AA::markDialog(new AboutDialog(buildView(info, params), parent), params);
         if (!dialog->isLoaded())
         {
             // QML 错误
             qWarning().noquote() << "GoodLaser: About dialog QML failed to load:" << dialog->loadError();
             delete dialog;
-            return RD::DialogResult{};
+            return AA::DialogResult{};
         }
 
         // 展示型对话框：只回传关闭方式（Rejected），没有数据。
-        return RD::runModalDialog(dialog);
+        return AA::runModalDialog(dialog);
     }
 }  // namespace GL

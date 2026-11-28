@@ -9,7 +9,7 @@ namespace TS
     {
         void runSample(const QJsonObject& args)
         {
-            RD::samples::runSampleCommand(QString::fromLatin1(RD::samples::kSampleRunCmdId), args);
+            AA::samples::runSampleCommand(QString::fromLatin1(AA::samples::kSampleRunCmdId), args);
         }
     }  // namespace
 
@@ -31,7 +31,7 @@ namespace TS
             .checkedWhen([this]() { return m_paused; });
 
         add(QStringLiteral("tools.settings"));
-        add(QString::fromLatin1(RD::samples::kSampleRunCmdId), runSample);
-        add(QString::fromLatin1(RD::about::kAboutCmdId));
+        add(QString::fromLatin1(AA::samples::kSampleRunCmdId), runSample);
+        add(QString::fromLatin1(AA::about::kAboutCmdId));
     }
 }  // namespace TS

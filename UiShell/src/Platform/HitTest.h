@@ -7,7 +7,7 @@
 
 #include <algorithm>
 
-namespace RD
+namespace AA
 {
     // 客户区命中的语义结果。平台层负责映射到自己的常量。
     enum class HitTestZone
@@ -65,4 +65,4 @@ namespace RD
 
         return HitTestZone::Client;
     }
-}  // namespace RD
+}  // namespace AA

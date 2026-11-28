@@ -11,7 +11,7 @@
 #include "Model/Profile/ProfileLoadResult.h"
 #include "Model/Profile/ProfileModel.h"
 
-namespace RD
+namespace AA
 {
     // profile 加载、诊断与计划生成
     class ProfilePipeline
@@ -100,4 +100,4 @@ namespace RD
         std::optional<ProfileModel> m_profileModel;
         quint64 m_featureRev = 0;
     };
-}  // namespace RD
+}  // namespace AA

@@ -9,7 +9,7 @@
 #include "Model/Json/Jsonc.h"
 #include "Model/Profile/ProfileLoadResult.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

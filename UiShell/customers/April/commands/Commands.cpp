@@ -6,8 +6,8 @@
 
 namespace Apr
 {
-    // ---------------- RD::ICommandCatalog ----------------
-    const RD::CommandView* Commands::find(const QString& commandId) const
+    // ---------------- AA::ICommandCatalog ----------------
+    const AA::CommandView* Commands::find(const QString& commandId) const
     {
         for (const auto& c : m_commands)
         {
@@ -17,7 +17,7 @@ namespace Apr
         return nullptr;
     }
 
-    // ---------------- RD::ICommandInvoker ----------------
+    // ---------------- AA::ICommandInvoker ----------------
     void Commands::invoke(const QString& commandId)
     {
         if (m_sink)
@@ -33,15 +33,15 @@ namespace Apr
             m_sink->dispatch(commandId, params);                // 实现负责透传/补齐，不整体覆盖
     }
 
-    // ---------------- RD::ICommandState ----------------
-    void Commands::queryState(const QString& commandId, RD::CommandStatus& status) const
+    // ---------------- AA::ICommandState ----------------
+    void Commands::queryState(const QString& commandId, AA::CommandStatus& status) const
     {
         status.bEnabled = m_sink ? m_sink->isRegistered(commandId) : false;
         status.bChecked = false;
     }
 
     // ---------------- 装配 ----------------
-    void Commands::addCommand(const RD::CommandView& command)
+    void Commands::addCommand(const AA::CommandView& command)
     {
         m_commands.append(command);
     }
@@ -80,7 +80,7 @@ namespace Apr
             if (obj.value(QStringLiteral("type")).toString() == QStringLiteral("command")
                 && !id.isEmpty() && !find(id))
             {
-                RD::CommandView view;
+                AA::CommandView view;
                 view.strId = id;
                 view.strTitleKey = obj.value(QStringLiteral("titleKey")).toString();
                 view.strIconKey = obj.value(QStringLiteral("iconKey")).toString();
@@ -104,7 +104,7 @@ namespace Apr
         return m_sink;
     }
 
-    const QList<RD::CommandView>& Commands::commands() const
+    const QList<AA::CommandView>& Commands::commands() const
     {
         return m_commands;
     }

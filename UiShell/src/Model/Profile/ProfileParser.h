@@ -4,7 +4,7 @@
 
 #include "Model/Profile/ProfileLoadResult.h"
 
-namespace RD
+namespace AA
 {
     // 从 UTF-8 JSON 文本解析 profile。
     // 只做解析与校验，不读文件、不创建控件，便于单测与复用。
@@ -15,4 +15,4 @@ namespace RD
         // 允许带 BOM 与 //、/* */ 注释；出错时返回 diagnostics 且 model 为空。
         static ProfileLoadResult loadFromJson(const QByteArray& utf8Json);
     };
-}  // namespace RD
+}  // namespace AA

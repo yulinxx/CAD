@@ -5,7 +5,7 @@
 
 #include "UiShell/Contract/CommandTable.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

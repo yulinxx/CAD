@@ -8,7 +8,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     // 平台窗口框架：Windows 自绘窗口（无边框 + DWM 命中），其它平台 Qt 原生窗口。
     class IWindowFrame
@@ -39,4 +39,4 @@ namespace RD
     };
 
     std::unique_ptr<IWindowFrame> createWindowFrame();
-}  // namespace RD
+}  // namespace AA

@@ -6,7 +6,7 @@
 #include "Model/Profile/ProfileParser.h"
 #include "Model/Profile/ProfileLoadResult.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

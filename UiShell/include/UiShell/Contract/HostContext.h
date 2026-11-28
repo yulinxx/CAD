@@ -6,7 +6,7 @@
 
 #include "UiShell/Contract/ITextProvider.h"
 
-namespace RD
+namespace AA
 {
     namespace ThemeId
     {
@@ -93,4 +93,4 @@ namespace RD
     public:
         virtual void showStatusMessage(const QString& text) = 0;
     };
-}  // namespace RD
+}  // namespace AA

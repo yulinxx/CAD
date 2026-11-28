@@ -3,7 +3,7 @@
 #include "AboutDialog.h"
 #include "UiShell/Contract/ModalDialog.h"
 
-namespace RD::about
+namespace AA::about
 {
     DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
@@ -11,4 +11,4 @@ namespace RD::about
         // 展示型对话框：只回传真实的关闭方式，没有数据。
         return runModalDialog(markDialog(new AboutDialog(AboutDlgData::setData(params), parent), params));
     }
-}  // namespace RD::about
+}  // namespace AA::about

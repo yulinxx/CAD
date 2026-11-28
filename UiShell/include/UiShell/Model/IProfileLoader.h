@@ -10,7 +10,7 @@
 #include "Model/Profile/ProfileModel.h"
 #include "UiShell/Contract/Diagnostic.h"
 
-namespace RD
+namespace AA
 {
     // Profile 加载/校验/JSONC 预处理统一入口；具体实现类留在 src/Model/ 内部。
     class IProfileLoader
@@ -38,4 +38,4 @@ namespace RD
 
     // 静态库 UiShellModel 内实现；调用方链接 UiShellModel 后可见。
     IProfileLoader* createProfileLoader();
-}  // namespace RD
+}  // namespace AA

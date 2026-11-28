@@ -111,7 +111,7 @@ namespace MS
         const char* mainIcon,
         const QVector<LeftMenuItemDesc>& items,
         const std::function<void(const QString&)>& onTrigger,
-        RD::IShellHost* host = nullptr)
+        AA::IShellHost* host = nullptr)
     {
         auto* btn = makeLeftBtn(parent, toolId, tooltip, mainIcon);
 
@@ -202,7 +202,7 @@ namespace MS
         return btn;
     }
 
-    LeftToolBar::LeftToolBar(RD::IShellHost* host, QWidget* parent)
+    LeftToolBar::LeftToolBar(AA::IShellHost* host, QWidget* parent)
         : QWidget(parent)
         , m_host(host)
     {

@@ -20,7 +20,7 @@
 #include <windows.h>
 #include <windowsx.h>
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -421,4 +421,4 @@ namespace RD
     {
         return std::unique_ptr<IWindowFrame>(new WindowsWindowFrame());
     }
-}  // namespace RD
+}  // namespace AA

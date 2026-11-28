@@ -8,7 +8,7 @@
 
 #include "UiShell/Contract/HostContext.h"
 
-namespace RD
+namespace AA
 {
     // 语言切换刷新
     //
@@ -44,4 +44,4 @@ namespace RD
         widget->setProperty("msuiRole", role);
         widget->setProperty("msuiSeries", series);
     }
-}  // namespace RD
+}  // namespace AA

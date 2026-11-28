@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -441,4 +441,4 @@ namespace RD
     {
         return new TitleBar(spec, host, parent);
     }
-}  // namespace RD
+}  // namespace AA

@@ -8,7 +8,7 @@
 #include "UiShell/i18n/IQtTextProvider.h"
 #include "UiShell/i18n/ITranslationService.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

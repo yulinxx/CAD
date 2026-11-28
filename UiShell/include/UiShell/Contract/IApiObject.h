@@ -1,6 +1,6 @@
 #pragma once
 
-namespace RD
+namespace AA
 {
     // 跨 DLL 版本号
     constexpr int kUiApiVersion = 3;
@@ -86,4 +86,4 @@ namespace RD
     private:
         T* m_object = nullptr;
     };
-}  // namespace RD
+}  // namespace AA

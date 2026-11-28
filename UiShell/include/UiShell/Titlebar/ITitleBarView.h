@@ -9,7 +9,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class ITitleBarHost;
 
@@ -38,4 +38,4 @@ namespace RD
     UI_SHELL_API ITitleBarView* createTitleBar(
         const TitleBarSpec& spec, ITitleBarHost* host = nullptr, QWidget* parent = nullptr);
     // 所有权：传入 parent 时由父对象持有，不要 destroy()；parent 为空时调用方负责 destroy()。
-}  // namespace RD
+}  // namespace AA

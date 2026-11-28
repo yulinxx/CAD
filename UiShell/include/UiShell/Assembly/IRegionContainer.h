@@ -5,7 +5,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     // 区域容器查询接口；控件由 shell 创建并随控件树销毁，调用方不能 destroy/delete
     class IRegionContainer
@@ -22,4 +22,4 @@ namespace RD
         virtual QWidget* panelWidget(const QString& panelId) const = 0;
         virtual QWidget* paneAreaWidget(const QString& paneAreaId) const = 0;
     };
-}  // namespace RD
+}  // namespace AA

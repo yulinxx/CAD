@@ -1,5 +1,7 @@
 #include "AprilWorkbench.h"
 
+#include <utility>
+
 #include <QString>
 #include <QWidget>
 
@@ -8,7 +10,7 @@ namespace Apr
     AprilWorkbench::AprilWorkbench() = default;
     AprilWorkbench::~AprilWorkbench() = default;
 
-    // ---------------- RD::ICenterViewProvider ----------------
+    // ---------------- AA::ICenterViewProvider ----------------
     QWidget* AprilWorkbench::createCenterView(QWidget* parent)
     {
         if (m_kind == ViewportKind::ThreeD)
@@ -23,6 +25,18 @@ namespace Apr
     // ---------------- 低耦合 port ----------------
     void AprilWorkbench::setViewportFactory(IViewportFactory* factory) { m_viewportFactory = factory; }
     IViewportFactory* AprilWorkbench::viewportFactory() const { return m_viewportFactory; }
+
+    void AprilWorkbench::setPositionSink(PositionSink sink)
+    {
+        m_positionSink = std::move(sink);
+        attachViewportCallbacks();
+    }
+
+    void AprilWorkbench::attachViewportCallbacks()
+    {
+        if (m_cadViewport)
+            m_cadViewport->setPositionCallback(m_positionSink);
+    }
     void AprilWorkbench::setServiceFactory(ICadServiceFactory* services) { m_serviceFactory = services; }
     ICadServiceFactory* AprilWorkbench::serviceFactory() const { return m_serviceFactory; }
     IViewportServices* AprilWorkbench::viewportServices() const { return m_viewportServices; }
@@ -36,9 +50,9 @@ namespace Apr
     }
 
     // ---------------- UiShell ShellServices 互转 ----------------
-    void AprilWorkbench::populateShellServices(RD::ShellServices& shell) const
+    void AprilWorkbench::populateShellServices(AA::ShellServices& shell) const
     {
-        shell.centerView = const_cast<AprilWorkbench*>(this);  // RD::ICenterViewProvider*
+        shell.centerView = const_cast<AprilWorkbench*>(this);  // AA::ICenterViewProvider*
         shell.strThemeId = m_themeId;
         shell.strStyleSeries = m_styleSeries;
         shell.strCustomStyle = m_customStyle;
@@ -47,7 +61,7 @@ namespace Apr
         shell.cmdState = m_cmdState;
     }
 
-    void AprilWorkbench::applyShellServices(const RD::ShellServices& shell)
+    void AprilWorkbench::applyShellServices(const AA::ShellServices& shell)
     {
         m_themeId = shell.strThemeId;
         m_styleSeries = shell.strStyleSeries;
@@ -69,6 +83,7 @@ namespace Apr
             m_cadViewport = m_viewportFactory->create2D(parent);
             if (m_cadViewport && m_viewportServices)
                 m_cadViewport->bindServices(*m_viewportServices);  // 经 port 注入，不暴露 raw 算法对象
+            attachViewportCallbacks();
             QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
             if (w)
             {
@@ -94,6 +109,7 @@ namespace Apr
             m_cadViewport = m_viewportFactory->create3D(parent);
             if (m_cadViewport && m_viewportServices)
                 m_cadViewport->bindServices(*m_viewportServices);
+            attachViewportCallbacks();
             QWidget* w = m_cadViewport ? m_cadViewport->widget() : nullptr;
             if (w)
             {

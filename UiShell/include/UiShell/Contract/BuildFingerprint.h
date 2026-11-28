@@ -3,7 +3,7 @@
 #include "UiShell/Export.h"
 #include "UiBuildInfo.h"
 
-namespace RD
+namespace AA
 {
     // EXE 的构建指纹
     inline const char* hostBuildFingerprint() noexcept
@@ -16,4 +16,4 @@ namespace RD
 
     // 当前客户 DLL 的构建指纹
     UI_CUSTOMER_API const char* customerBuildFingerprint() noexcept;
-}  // namespace RD
+}  // namespace AA

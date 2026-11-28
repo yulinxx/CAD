@@ -6,7 +6,7 @@
 #include "Model/Profile/ProfileLoadResult.h"
 #include "Model/Profile/ProfileModel.h"
 
-namespace RD
+namespace AA
 {
     QList<Diagnostic> ProfileValidator::validate(const ProfileModel& model)
     {
@@ -83,4 +83,4 @@ namespace RD
 
         return diagnostics;
     }
-}  // namespace RD
+}  // namespace AA

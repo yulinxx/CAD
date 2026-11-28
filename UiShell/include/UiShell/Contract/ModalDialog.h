@@ -7,7 +7,7 @@
 
 #include "UiShell/Contract/DialogRegistry.h"
 
-namespace RD
+namespace AA
 {
     // 模态方式调用对话框
     template<typename Dialog, typename Collect>
@@ -57,4 +57,4 @@ namespace RD
     {
         return runModalDialog(dialog, [](Dialog*) { return QJsonObject(); });
     }
-}  // namespace RD
+}  // namespace AA

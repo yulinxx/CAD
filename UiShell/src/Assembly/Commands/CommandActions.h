@@ -12,7 +12,7 @@ class QAction;
 class QActionGroup;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     struct CommandView;
     struct ShellServices;
@@ -60,4 +60,4 @@ namespace RD
         // 没有 ICommandState 提供勾选值时，由这里记住勾选态：shell 重建后新动作沿用。
         QHash<QString, bool> m_checked;
     };
-}  // namespace RD
+}  // namespace AA

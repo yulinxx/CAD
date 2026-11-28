@@ -20,7 +20,7 @@
 #include "dialogs/AboutDialogFactory.h"
 #include "UiDialogs/AboutDialogs.h"
 
-using namespace RD;
+using namespace AA;
 using about::AboutDlgData;
 namespace Param = about::Param;
 using TS::AboutDialog;

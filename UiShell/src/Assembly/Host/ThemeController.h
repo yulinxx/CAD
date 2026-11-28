@@ -3,7 +3,7 @@
 #include <QPalette>
 #include <QString>
 
-namespace RD
+namespace AA
 {
     // 主题控制器
     class ThemeController
@@ -19,4 +19,4 @@ namespace RD
                           const QString& customPrefix = QString(),
                           const QString& profileDir = QString());
     };
-}  // namespace RD
+}  // namespace AA

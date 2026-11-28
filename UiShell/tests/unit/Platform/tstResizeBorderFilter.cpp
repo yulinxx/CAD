@@ -6,7 +6,7 @@
 
 #include "Platform/ResizeBorderFilter.h"
 
-using namespace RD;
+using namespace AA;
 
 // ResizeBorderFilter 是 Linux/macOS 边缘缩放的唯一入口：
 // onStartResize 没被窗口框架赋值时，拖拽边缘只会改光标、不会缩放。

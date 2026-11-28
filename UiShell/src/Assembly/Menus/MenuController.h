@@ -9,7 +9,7 @@ class QMenu;
 class QMenuBar;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class CommandActions;
     struct AssemblyInfo;
@@ -49,4 +49,4 @@ namespace RD
         CBFunc m_cbLanguage;
         CBFunc m_cbTheme;
     };
-}  // namespace RD
+}  // namespace AA

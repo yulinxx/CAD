@@ -17,7 +17,7 @@ class QMainWindow;
 class QMenuBar;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class CommandActions;
     class IShellHost;
@@ -63,6 +63,9 @@ namespace RD
 
         // 只重建标题栏与菜单栏
         void refreshShell();
+
+        // 只重建中央视图：客户切换工作台形态后复用同一装配计划。
+        void refreshCenterView();
 
         // 装配诊断
         const QList<Diagnostic>& assemblyDiagnostics() const
@@ -126,4 +129,4 @@ namespace RD
         std::unique_ptr<IWindowFrame> m_frame;
         std::unique_ptr<TitleBarHostAdapter> m_titleBarHostAdapter;
     };
-}  // namespace RD
+}  // namespace AA

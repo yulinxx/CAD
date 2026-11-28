@@ -6,11 +6,11 @@
 
 bool TranslationSetup::create()
 {
-    m_transService.reset(RD::createTranslationService());
+    m_transService.reset(AA::createTranslationService());
     if (!m_transService)
         return false;
 
-    m_text.reset(RD::createQtTextProvider());
+    m_text.reset(AA::createQtTextProvider());
     return static_cast<bool>(m_text);
 }
 

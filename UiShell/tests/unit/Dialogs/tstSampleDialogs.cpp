@@ -14,8 +14,8 @@
 #include "UiDialogs/SampleDialogs.h"
 #include "UiDialogs/SampleSolver.h"
 
-using namespace RD;
-using namespace RD::samples;
+using namespace AA;
+using namespace AA::samples;
 
 namespace
 {

@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace RD
+namespace AA
 {
     // 固定语义区域。区域类型是产品语义，不随客户变化；
     // 客户可配置的是区域顺序、可见性与子区域/面板归属。
@@ -84,4 +84,4 @@ namespace RD
     {
         return (isTopGroup(type) || isBottomGroup(type));
     }
-}  // namespace RD
+}  // namespace AA

@@ -10,7 +10,7 @@
 
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class IShellHost;
     class ITitleBarHost;
@@ -81,4 +81,4 @@ namespace RD
     public:
         virtual QWidget* createTitleBar(const TitleBarSpec& spec, ITitleBarHost* host, QWidget* parent) = 0;
     };
-}  // namespace RD
+}  // namespace AA

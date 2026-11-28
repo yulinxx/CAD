@@ -6,7 +6,7 @@ class QFrame;
 class QToolButton;
 class QVBoxLayout;
 
-namespace RD
+namespace AA
 {
     class IShellHost;
 }
@@ -28,7 +28,7 @@ namespace MS
 
     public:
         // host 用于取共享命令动作：工具按钮的勾选/图标/置灰由命令状态统一驱动。
-        explicit LeftToolBar(RD::IShellHost* host = nullptr, QWidget* parent = nullptr);
+        explicit LeftToolBar(AA::IShellHost* host = nullptr, QWidget* parent = nullptr);
         ~LeftToolBar() override = default;
 
     signals:
@@ -61,7 +61,7 @@ namespace MS
         void buildBottomButtons(QVBoxLayout* lay);
 
     private:
-        RD::IShellHost* m_host = nullptr;
+        AA::IShellHost* m_host = nullptr;
         QWidget* m_topSection = nullptr;
         QWidget* m_bottomSection = nullptr;
         QFrame* m_topLine = nullptr;      // 顶部分隔线，随主工具区一起显隐

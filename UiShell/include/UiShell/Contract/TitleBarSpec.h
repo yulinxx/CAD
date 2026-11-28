@@ -3,7 +3,7 @@
 #include <QString>
 #include <QStringList>
 
-namespace RD
+namespace AA
 {
     // 标题栏描述信息
     struct TitleBarSpec
@@ -23,4 +23,4 @@ namespace RD
         {
         }
     };
-}  // namespace RD
+}  // namespace AA

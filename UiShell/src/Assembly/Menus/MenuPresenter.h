@@ -2,7 +2,7 @@
 
 #include "UiShell/Assembly/IMenuPresenter.h"
 
-namespace RD
+namespace AA
 {
     // 默认菜单呈现器
     class MenuPresenter : public IMenuPresenter
@@ -18,4 +18,4 @@ namespace RD
             const ShellServices& services,
             QWidget* parent) const override;
     };
-}  // namespace RD
+}  // namespace AA

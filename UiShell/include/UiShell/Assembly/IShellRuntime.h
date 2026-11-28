@@ -13,7 +13,7 @@
 class QMainWindow;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class IRegionContainer;
 
@@ -32,6 +32,10 @@ namespace RD
         // 切換语言
         virtual void switchLanguage(const QString& language) = 0;
         virtual void retranslate() = 0;
+
+        // 重建中央视图：客户切换工作台形态后请求外壳重新向 ICenterViewProvider 取部件。
+        // 外壳只认识通用契约，不感知具体 2D/3D 实现。
+        virtual void refreshCenterView() = 0;
 
         // 切换皮肤
         virtual void switchTheme(const QString& themeId) = 0;
@@ -52,4 +56,4 @@ namespace RD
     };
 
     UI_SHELL_API IShellRuntime* createShellRuntime(const ShellServices& services);
-}  // namespace RD
+}  // namespace AA

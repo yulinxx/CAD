@@ -7,13 +7,13 @@ class QWidget;
 namespace GL
 {
     // 面板工厂
-    class PanelFactory : public RD::IWidgetFactory
+    class PanelFactory : public AA::IWidgetFactory
     {
     public:
-        QWidget* create(const RD::PanelCreateRequest& info) override;
+        QWidget* create(const AA::PanelCreateRequest& info) override;
     };
 
-    class CenterView : public RD::ICenterViewProvider
+    class CenterView : public AA::ICenterViewProvider
     {
     public:
         QWidget* createCenterView(QWidget* parent) override;

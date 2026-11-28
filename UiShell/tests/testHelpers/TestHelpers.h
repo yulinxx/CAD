@@ -29,7 +29,7 @@ class QObject;
 #  define UI_TEST_API
 #endif
 
-namespace RD::test
+namespace AA::test
 {
     // 记录被转发的命令 id。
     class UI_TEST_API FakeCommandInvoker : public ICommandInvoker
@@ -124,4 +124,4 @@ namespace RD::test
     {
         return root ? root->findChild<T*>(QString::fromLatin1(name)) : nullptr;
     }
-} // namespace RD::test
+} // namespace AA::test

@@ -15,7 +15,7 @@
 class QMainWindow;
 class QWidget;
 
-namespace RD
+namespace AA
 {
     class CommandActions;
     class DialogController;
@@ -50,6 +50,9 @@ namespace RD
         void switchLanguage(const QString& language) override;
         // 重译所有 IRetranslatable 控件
         void retranslate() override;
+
+        // 重建中央视图（工作台切换）
+        void refreshCenterView() override;
 
         // 切换皮肤
         void switchTheme(const QString& themeId) override;
@@ -202,4 +205,4 @@ namespace RD
         FeatureObserver m_ftObserver{ *this };
         quint64 m_ftSubscriptionId = 0;
     };
-}  // namespace RD
+}  // namespace AA

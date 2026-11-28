@@ -22,7 +22,7 @@
 #include "UiShell/Titlebar/ITitleBarView.h"
 #include "UiShell/i18n/ITranslationService.h"
 
-namespace RD
+namespace AA
 {
     ShellView::ShellView(const ShellServices& services,
         const AssemblyInfo& info,
@@ -449,6 +449,24 @@ namespace RD
         m_cmdActions.refresh();
     }
 
+    void ShellView::refreshCenterView()
+    {
+        if (!m_shell || !m_shellServices.centerView)
+            return;
+
+        for (RegionContainer* host : m_regContainers)
+        {
+            if (host->type() != RegionType::CenterView)
+                continue;
+
+            // 先销毁旧 widget，再让客户按当前工作台形态重新产出；面板与标题栏保持不动。
+            host->clearCenterWidget();
+            if (QWidget* widget = m_shellServices.centerView->createCenterView(host))
+                host->setCenterWidget(widget);
+            break;
+        }
+    }
+
     bool ShellView::embedsMenuInTitleBar() const
     {
         // 菜单内嵌是可选的标题栏特性：实现 ITitleBarMenuHost 才参与，
@@ -564,4 +582,4 @@ namespace RD
                 retranslatable->retranslate();
         }
     }
-}  // namespace RD
+}  // namespace AA

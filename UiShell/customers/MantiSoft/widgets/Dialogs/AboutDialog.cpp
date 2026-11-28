@@ -21,9 +21,9 @@ namespace MS
 
         // 工厂自翻译的默认数据（取代原 ui.json dialogBindings 的 about params）。
         // 文本由工厂翻译；logoPath 仍由 params 传入（相对路径，由 resolveParams 按部署方式解析）。
-        RD::about::AboutDlgData makeAboutData()
+        AA::about::AboutDlgData makeAboutData()
         {
-            RD::about::AboutDlgData data;
+            AA::about::AboutDlgData data;
             data.product = QCoreApplication::translate("about", "about.a.product");
             data.version = QStringLiteral("1.4.2");
             data.company = QCoreApplication::translate("about", "about.a.company");
@@ -87,9 +87,9 @@ namespace MS
     }  // namespace
 
     // —— AboutDialogFactory ——
-    RD::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
+    AA::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
-        RD::about::AboutDlgData info = makeAboutData();
+        AA::about::AboutDlgData info = makeAboutData();
         info.applyParams(params);  // params 覆盖默认值（测试传参 / 宿主注入 logoPath）。
 
         auto* dialog = new QDialog(parent);
@@ -161,6 +161,6 @@ namespace MS
 
         // markDialog 打上 msuiRole / msuiSeries，让框架 QSS rule 生效；
         // runModalDialog 负责 exec() 与 DialogResult 封装。展示型对话框只回传关闭方式，没有数据。
-        return RD::runModalDialog(RD::markDialog(dialog, params));
+        return AA::runModalDialog(AA::markDialog(dialog, params));
     }
 }  // namespace MS

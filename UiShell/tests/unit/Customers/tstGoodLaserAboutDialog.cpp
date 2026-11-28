@@ -21,7 +21,7 @@
 #include "UiDialogs/AboutDialogs.h"
 #include "UiShell/Contract/HostContext.h"
 
-using namespace RD;
+using namespace AA;
 namespace Param = about::Param;
 using GL::AboutDialogFactory;
 

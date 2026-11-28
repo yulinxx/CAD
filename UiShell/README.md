@@ -784,20 +784,20 @@ QML 等不走 QSS 的对话框据此配色（GoodLaser 的 QML 关于框就是�
 
 ```cpp
 // 客户 AboutDialogFactory：工厂自翻译默认数据
-RD::about::AboutDlgData makeAboutData()
+AA::about::AboutDlgData makeAboutData()
 {
-    RD::about::AboutDlgData data;
+    AA::about::AboutDlgData data;
     data.product = QCoreApplication::translate("about", "about.a.product");
     data.version = QStringLiteral("1.4.2");
     data.company = QCoreApplication::translate("about", "about.a.company");
     return data;
 }
 
-RD::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
+AA::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
 {
-    RD::about::AboutDlgData info = makeAboutData();
+    AA::about::AboutDlgData info = makeAboutData();
     info.applyParams(params);   // 绑定 params 覆盖默认值（如 logoPath）
-    return RD::runModalDialog(RD::markDialog(new AboutDialog(info, parent), params));
+    return AA::runModalDialog(AA::markDialog(new AboutDialog(info, parent), params));
 }
 ```
 
@@ -1133,7 +1133,7 @@ namespace customerX
 {
     namespace
     {
-        class ModuleParts final : public RD::IApiObject
+        class ModuleParts final : public AA::IApiObject
         {
         public:
             CustomerXPanelFactory panels;
@@ -1148,7 +1148,7 @@ namespace customerX
 - 宿主（`CustomerModuleProvider`）接管 `owner` 并清空该字段；`AppBootstrap` 里客户模块最后析构，
   因此运行期与注册表先销毁，工厂指针不会悬空；
 - 客户实现都放在自己的顶级命名空间 `MS`（MantiSoft）/ `GL`（GoodLaser）/ `TS`（TyvokStudio），
-  静态构建（`UI_BUILD_SHARED=OFF`）时与共享库同名类（如 `RD::about::AboutDialog`）不冲突；
+  静态构建（`UI_BUILD_SHARED=OFF`）时与共享库同名类（如 `AA::about::AboutDialog`）不冲突；
   `createCustomerModule()` / `customerBuildFingerprint()` 仍在 `RD`；
 - `Q_INIT_RESOURCE` 必须在全局命名空间调用，资源初始化函数因此留在命名空间外；
 - `cmake/CheckExports.cmake` 按命名空间（`@customerA@` 等）禁止客户 DLL 导出实现类。

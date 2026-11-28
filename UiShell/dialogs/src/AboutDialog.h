@@ -4,7 +4,7 @@
 
 #include "UiDialogs/AboutDialogs.h"
 
-namespace RD::about
+namespace AA::about
 {
     // 默认 关于对话框
     class AboutDialog : public QDialog
@@ -12,4 +12,4 @@ namespace RD::about
     public:
         explicit AboutDialog(const AboutDlgData& info, QWidget* parent = nullptr);
     };
-}  // namespace RD::about
+}  // namespace AA::about

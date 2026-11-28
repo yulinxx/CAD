@@ -8,7 +8,7 @@
 
 class QWidget;
 
-namespace RD::samples
+namespace AA::samples
 {
     // 示例：「参数对话框 → 命令 → 算法」的完整链路，新增算法对话框照此编写
     //   客户代码：CustomerModule::listDialogBind 把命令 sample.run 绑到 dialog.sample.params，params 写本客户的默认值 / 可选项；
@@ -33,4 +33,4 @@ namespace RD::samples
     // 已翻译的方法名与结果文字：默认实现与客户自定义界面共用。
     QString methodDisplayName(const QString& methodId);
     QString describeResult(const SampleParams& params, const SampleResult& result);
-}  // namespace RD::samples
+}  // namespace AA::samples

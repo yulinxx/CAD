@@ -11,9 +11,9 @@ namespace TS
     {
         // 工厂自翻译的默认数据（取代原 ui.json dialogBindings 的 about params）。
         // 文本由工厂翻译；logoPath 仍由 params 传入（相对路径，由 resolveParams 按部署方式解析）。
-        RD::about::AboutDlgData makeAboutData()
+        AA::about::AboutDlgData makeAboutData()
         {
-            RD::about::AboutDlgData data;
+            AA::about::AboutDlgData data;
             data.product = QCoreApplication::translate("about", "about.b.product");
             data.version = QStringLiteral("5.0.1");
             data.versionDate = QStringLiteral("2026-02-18");
@@ -26,10 +26,10 @@ namespace TS
         }
     }  // namespace
 
-    RD::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
+    AA::DialogResult AboutDialogFactory::openDialog(QWidget* parent, const QJsonObject& params)
     {
-        RD::about::AboutDlgData info = makeAboutData();
+        AA::about::AboutDlgData info = makeAboutData();
         info.applyParams(params);  // params 覆盖默认值（测试传参 / 宿主注入 logoPath）。
-        return RD::runModalDialog(RD::markDialog(new AboutDialog(info, parent), params));
+        return AA::runModalDialog(AA::markDialog(new AboutDialog(info, parent), params));
     }
 }  // namespace TS

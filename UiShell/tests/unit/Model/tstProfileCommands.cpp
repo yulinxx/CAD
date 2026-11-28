@@ -10,7 +10,7 @@
 #include "UiShell/Assembly/ShellServices.h"
 #include "UiShell/Contract/CommandTable.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

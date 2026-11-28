@@ -3,7 +3,7 @@
 #include "Platform/WindowFrame.h"
 #include "Platform/HitTest.h"
 
-using namespace RD;
+using namespace AA;
 
 // 平台层的纯逻辑测试：不依赖真实 HWND，offscreen 下就能跑。
 // attach/Win32 样式/DPI 枚举等依赖真实窗口的部分，留给集成测试。
@@ -133,7 +133,7 @@ namespace
 
     HitTestZone hitTest(const Point& p, const Rect& r, bool maximized, int band)
     {
-        return RD::hitTestZone(p.x, p.y, r.width, r.height, maximized, band);
+        return AA::hitTestZone(p.x, p.y, r.width, r.height, maximized, band);
     }
 } // namespace
 

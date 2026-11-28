@@ -4,12 +4,15 @@
 #include "ports/CompositionRootAdapter.h"
 #include "commands/Commands.h"
 #include "commands/OperationCommandSink.h"
+#include "ports/DrawToolSwitchRegistry.h"
 
 // ---- AprilCore ----
 #include "Composition/ApplicationCompositionRoot.h"
 
 // ---- UiShell ----
+#include "UiShell/Assembly/ActiveRuntime.h"
 #include "UiShell/Assembly/HostWindow.h"
+#include "UiShell/Assembly/IShellRuntime.h"
 
 namespace Apr
 {
@@ -22,7 +25,8 @@ namespace Apr
                              AprilWorkbench& workbench,
                              Commands& commands,
                              CompositionRootAdapter& adapter,
-                             OperationCommandSink& sink)
+                             OperationCommandSink& sink,
+                             DrawToolSwitchRegistry& toolSwitchRegistry)
     {
         if (!root.isBuilt())
             return false;
@@ -49,8 +53,16 @@ namespace Apr
             workbench.setViewportKind(commandId == QLatin1String("view.switch_to_3d")
                 ? ViewportKind::ThreeD
                 : ViewportKind::TwoD);
+            // Kind alone is data; the shell owns the widget tree and must remount it.
+            if (AA::IShellRuntime* runtime = AA::activeRuntime())
+                runtime->refreshCenterView();
         });
         adapter.setCommandSink(&sink);
+
+        // 左侧工具栏按钮走 CommandCatalog → OperationBus → 视口；注册留在客户层。
+        toolSwitchRegistry.setBus(root.operationBus());
+        toolSwitchRegistry.setWorkbench(&workbench);
+        toolSwitchRegistry.registerAll();
         attachCommandSink(commands, &sink);
 
         return viewportWired;
@@ -60,6 +72,7 @@ namespace Apr
                                Commands& commands,
                                CompositionRootWiring& wiring,
                                OperationCommandSink& sink,
+                               DrawToolSwitchRegistry& toolSwitchRegistry,
                                ApplicationCompositionRoot* existing)
     {
         ApplicationCompositionRoot* root = existing;
@@ -72,7 +85,7 @@ namespace Apr
         }
 
         // M6：主窗口由 UiShell 在 createCustomerModule() 之前发布；组合根只借用指针。
-        root->setMainWindow(RD::hostMainWindow());
+        root->setMainWindow(AA::hostMainWindow());
 
         // 尝试装配（幂等；已 build 直接返回 true）
         if (!root->isBuilt())
@@ -88,7 +101,8 @@ namespace Apr
         if (!wiring.adapter)
             wiring.adapter = std::make_unique<CompositionRootAdapter>(*root);
 
-        wiring.wired = wireCompositionRoot(*root, workbench, commands, *wiring.adapter, sink);
+        wiring.wired = wireCompositionRoot(
+            *root, workbench, commands, *wiring.adapter, sink, toolSwitchRegistry);
         return wiring.wired;
     }
 }  // namespace Apr

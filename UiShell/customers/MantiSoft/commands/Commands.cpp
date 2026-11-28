@@ -10,7 +10,7 @@ namespace MS
         // 示例算法：参数来自 dialog.sample.params 的结果或面板直接给的 args，算法本身与界面无关。
         void runSample(const QJsonObject& args)
         {
-            RD::samples::runSampleCommand(QString::fromLatin1(RD::samples::kSampleRunCmdId), args);
+            AA::samples::runSampleCommand(QString::fromLatin1(AA::samples::kSampleRunCmdId), args);
         }
 
         struct LegacyCommand
@@ -31,7 +31,7 @@ namespace MS
         add(QStringLiteral("test.edit.redo"), [this](const QJsonObject&) {
             // Redo：在本客户端暂无实现业务，仅记录状态变化
             }).title(QStringLiteral("command.edit.redo")).shortcut(QStringLiteral("Ctrl+Y"));
-        add(QString::fromLatin1(RD::samples::kSampleRunCmdId), runSample).shortcut(QStringLiteral("F5"));
+        add(QString::fromLatin1(AA::samples::kSampleRunCmdId), runSample).shortcut(QStringLiteral("F5"));
 
         const QString ICON_DIR = QStringLiteral(":/UiMantiSoft/profile/assets/icons/");
 
@@ -221,7 +221,7 @@ namespace MS
 
             // 模式命令执行时只切换当前工具；勾选态由 checkedWhen 统一推导，
             // 菜单、顶部工具栏、左侧栏因此共享同一份高亮与互斥状态。
-            RD::CommandTable::Handler handler;
+            AA::CommandTable::Handler handler;
             if (cmd.isMode)
                 handler = [this, id](const QJsonObject&) { m_activeTool = id; };
             // 文档状态控制：new/open 置 true，close/exit 重置

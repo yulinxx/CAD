@@ -2,7 +2,7 @@
 
 #include <QString>
 
-namespace RD
+namespace AA
 {
     struct Diagnostic
     {
@@ -19,4 +19,4 @@ namespace RD
         int nLine = 0;     // 1 基行号，0 = 未知
         int nColumn = 0;   // 1 基列号，0 = 未知
     };
-}  // namespace RD
+}  // namespace AA

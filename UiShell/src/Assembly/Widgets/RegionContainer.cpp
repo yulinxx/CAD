@@ -3,7 +3,7 @@
 #include <QBoxLayout>
 #include <QLayoutItem>
 
-namespace RD
+namespace AA
 {
     RegionContainer::RegionContainer(QWidget* parent)
         : QWidget(parent)
@@ -246,4 +246,4 @@ namespace RD
         m_centerWidget = nullptr;
         return widget;
     }
-}  // namespace RD
+}  // namespace AA

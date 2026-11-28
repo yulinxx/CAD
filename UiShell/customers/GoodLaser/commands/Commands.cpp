@@ -9,7 +9,7 @@ namespace GL
     {
         void runSample(const QJsonObject& args)
         {
-            RD::samples::runSampleCommand(QString::fromLatin1(RD::samples::kSampleRunCmdId), args);
+            AA::samples::runSampleCommand(QString::fromLatin1(AA::samples::kSampleRunCmdId), args);
         }
     }  // namespace
 
@@ -21,7 +21,7 @@ namespace GL
         add(QStringLiteral("manufacture.run"));
         add(QStringLiteral("analysis.measure"));
         add(QStringLiteral("window.reset"));
-        add(QString::fromLatin1(RD::samples::kSampleRunCmdId), runSample).shortcut(QStringLiteral("F5"));
-        add(QString::fromLatin1(RD::about::kAboutCmdId));
+        add(QString::fromLatin1(AA::samples::kSampleRunCmdId), runSample).shortcut(QStringLiteral("F5"));
+        add(QString::fromLatin1(AA::about::kAboutCmdId));
     }
 }  // namespace GL

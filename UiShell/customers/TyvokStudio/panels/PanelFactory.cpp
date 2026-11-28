@@ -11,16 +11,16 @@
 
 namespace
 {
-    using RetranslatableLabel = RD::Retranslatable<QLabel>;
-    using RetranslatableFrame = RD::Retranslatable<QFrame>;
-    using RetranslatableList = RD::Retranslatable<QListWidget>;
+    using RetranslatableLabel = AA::Retranslatable<QLabel>;
+    using RetranslatableFrame = AA::Retranslatable<QFrame>;
+    using RetranslatableList = AA::Retranslatable<QListWidget>;
 
     // 状态栏面板：显示 IShellHost::showMessage() 推来的提示；语言切换时恢复默认文字。
-    class StatusLabel final : public RD::Retranslatable<QLabel>, public RD::IStatusMessageView
+    class StatusLabel final : public AA::Retranslatable<QLabel>, public AA::IStatusMessageView
     {
     public:
         explicit StatusLabel(QWidget* parent)
-            : RD::Retranslatable<QLabel>(parent)
+            : AA::Retranslatable<QLabel>(parent)
         {
         }
 
@@ -63,7 +63,7 @@ namespace
 
 namespace TS
 {
-    QWidget* PanelFactory::create(const RD::PanelCreateRequest& info)
+    QWidget* PanelFactory::create(const AA::PanelCreateRequest& info)
     {
         if (info.strPanelId == QLatin1String("status"))
         {
@@ -71,7 +71,7 @@ namespace TS
             label->setObjectName(QStringLiteral("panel:") + info.strPanelId);
             label->setText(panelTitle(info.strPanelId));
 
-            RD::markPanel(label, QStringLiteral("panelStatus"), QStringLiteral("tyvokstudio"));
+            AA::markPanel(label, QStringLiteral("panelStatus"), QStringLiteral("tyvokstudio"));
 
             label->onRetranslate([label, panelId = info.strPanelId]() {
                 label->setText(panelTitle(panelId));
@@ -87,7 +87,7 @@ namespace TS
         {
             auto* list = new RetranslatableList(info.parent);
             list->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-            RD::markPanel(list, QStringLiteral("panelList"), QStringLiteral("tyvokstudio"));
+            AA::markPanel(list, QStringLiteral("panelList"), QStringLiteral("tyvokstudio"));
             list->addItems(texts(info.strPanelId));
 
             list->onRetranslate([list, panelId = info.strPanelId]() {
@@ -100,11 +100,11 @@ namespace TS
 
         auto* frame = new RetranslatableFrame(info.parent);
         frame->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-        RD::markPanel(frame, QStringLiteral("panel"), QStringLiteral("tyvokstudio"));
+        AA::markPanel(frame, QStringLiteral("panel"), QStringLiteral("tyvokstudio"));
         auto* layout = new QVBoxLayout(frame);
         layout->setContentsMargins(10, 8, 10, 8);
         auto* title = new QLabel(panelTitle(info.strPanelId), frame);
-        RD::markPanel(title, QStringLiteral("panelTitle"), QStringLiteral("tyvokstudio"));
+        AA::markPanel(title, QStringLiteral("panelTitle"), QStringLiteral("tyvokstudio"));
         layout->addWidget(title);
 
         frame->onRetranslate([title, panelId = info.strPanelId]() {
@@ -127,7 +127,7 @@ namespace TS
         view->setObjectName(QStringLiteral("center.view"));
         view->setAlignment(Qt::AlignCenter);
         view->setMinimumSize(420, 300);
-        RD::markPanel(view, QStringLiteral("centerView"), QStringLiteral("tyvokstudio"));
+        AA::markPanel(view, QStringLiteral("centerView"), QStringLiteral("tyvokstudio"));
 
         view->onRetranslate([view]() {
             view->setText(QCoreApplication::translate(

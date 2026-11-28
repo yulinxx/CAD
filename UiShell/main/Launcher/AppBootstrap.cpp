@@ -42,7 +42,7 @@ int AppBootstrap::start(QMainWindow* window)
 
     // 客户模块装配服务时需要主窗口指针；必须在 createCustomerModule() 之前发布，
     // 且不能跨 CRT 传 STL 对象。
-    RD::setHostMainWindow(window);
+    AA::setHostMainWindow(window);
 
     // 先加载翻译服务，再加载客户模块
     m_transSetup = std::make_unique<TranslationSetup>();
@@ -69,20 +69,20 @@ int AppBootstrap::start(QMainWindow* window)
     }
 
     // 指纹校验：宿主 / shell 必须同一次构建
-    if (qstrcmp(RD::hostBuildFingerprint(), RD::shellBuildFingerprint()) != 0)
+    if (qstrcmp(AA::hostBuildFingerprint(), AA::shellBuildFingerprint()) != 0)
     {
         std::fprintf(stderr, "App: UiShell build fingerprint mismatch\n");
         return kExitShellRuntime;
     }
 
     // 创建 shell 提供的对象。
-    m_featureFlags.reset(RD::createFeatureFlagStore());
-    m_widgetReg.reset(RD::createWidgetFactoryRegistry());
-    m_dlgReg.reset(RD::createDialogRegistry());
+    m_featureFlags.reset(AA::createFeatureFlagStore());
+    m_widgetReg.reset(AA::createWidgetFactoryRegistry());
+    m_dlgReg.reset(AA::createDialogRegistry());
 
     // 框架默认对话工厂
-    static RD::about::AboutDialogFactory kDefaultAbout;
-    m_dlgReg->registerFactory(RD::about::kAboutDlgId, &kDefaultAbout);
+    static AA::about::AboutDialogFactory kDefaultAbout;
+    m_dlgReg->registerFactory(AA::about::kAboutDlgId, &kDefaultAbout);
 
     if (!m_featureFlags || !m_widgetReg || !m_dlgReg)
     {
@@ -91,20 +91,20 @@ int AppBootstrap::start(QMainWindow* window)
     }
 
     // 注册客户面板与对话框工厂。
-    const RD::CustomerModule& module = m_moduleProvider->module();
-    for (const RD::WidgetFactoryBinding& binding : module.listWidgetFactoriesBind)
+    const AA::CustomerModule& module = m_moduleProvider->module();
+    for (const AA::WidgetFactoryBinding& binding : module.listWidgetFactoriesBind)
     {
         if (!binding.strFactoryId.isEmpty() && binding.factory)
             m_widgetReg->registerFactory(binding.strFactoryId, binding.factory);
     }
-    for (const RD::DlgFactoryBinding& binding : module.listDlgFactoriesBind)
+    for (const AA::DlgFactoryBinding& binding : module.listDlgFactoriesBind)
     {
         if (!binding.strDialogId.isEmpty() && binding.factory)
             m_dlgReg->registerFactory(binding.strDialogId, binding.factory);
     }
 
     // 组装 ShellServices
-    RD::ShellServices services;
+    AA::ShellServices services;
     services.titleBarFactory = module.titleBar;
     services.centerView = module.centerView;
     services.cmdCatalog = module.cmdCatalog;
@@ -120,7 +120,7 @@ int AppBootstrap::start(QMainWindow* window)
     services.transService = m_transSetup->service();
     services.shellListener = this;
 
-    m_shellRT.reset(RD::createShellRuntime(services));
+    m_shellRT.reset(AA::createShellRuntime(services));
     if (!m_shellRT)
     {
         std::fprintf(stderr, "App: createShellRuntime returned null\n");

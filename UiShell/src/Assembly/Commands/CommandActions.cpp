@@ -11,7 +11,7 @@
 #include "Assembly/Host/ThemedIcon.h"
 #include "UiShell/Assembly/ShellServices.h"
 
-namespace RD
+namespace AA
 {
     CommandActions::CommandActions(const ShellServices* services, Trigger trigger)
         : m_shellServices(services)
@@ -67,11 +67,14 @@ namespace RD
 
         auto* created = new QAction(m_owner);
         created->setObjectName(QStringLiteral("msui.action.") + commandId);
+        // 标记“来自 profile 命令目录”：MenuController 只给内置语言/皮肤动作做直连，
+        // 避免同一动作既走命令分发又被内置绑定处理两次（语言切换会执行两遍）。
+        created->setProperty("msui.profileCommand", true);
 
         if (view)
         {
             if (!view->strIconKey.isEmpty())
-                created->setIcon(RD::themedIcon(view->strIconKey));
+                created->setIcon(AA::themedIcon(view->strIconKey));
             if (!view->strShortcut.isEmpty())
                 created->setShortcut(QKeySequence(view->strShortcut, QKeySequence::PortableText));
             created->setCheckable(view->bCheckable);
@@ -132,7 +135,7 @@ namespace RD
         if (!view || view->strIconKey.isEmpty())
             return;
 
-        action->setIcon(RD::themedIcon(view->strIconKey));
+        action->setIcon(AA::themedIcon(view->strIconKey));
     }
 
     void CommandActions::applyText(QAction* action, const QString& commandId) const
@@ -186,4 +189,4 @@ namespace RD
             m_checked.insert(commandId, status.bChecked);
         }
     }
-}  // namespace RD
+}  // namespace AA

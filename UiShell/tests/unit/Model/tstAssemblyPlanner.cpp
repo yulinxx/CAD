@@ -8,7 +8,7 @@
 #include "UiShell/Contract/Command.h"
 #include "UiShell/Contract/ITextProvider.h"
 
-using namespace RD;
+using namespace AA;
 
 namespace
 {

@@ -11,12 +11,12 @@ namespace TS
     class AboutDialog : public QDialog
     {
     public:
-        explicit AboutDialog(const RD::about::AboutDlgData& info, QWidget* parent = nullptr);
+        explicit AboutDialog(const AA::about::AboutDlgData& info, QWidget* parent = nullptr);
 
     public:
         QString plainText() const;
 
     private:
-        RD::about::AboutDlgData m_info;
+        AA::about::AboutDlgData m_info;
     };
 }  // namespace TS

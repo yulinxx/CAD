@@ -3,7 +3,7 @@
 #include <QMutexLocker>
 #include <QThread>
 
-namespace RD
+namespace AA
 {
     FeatureFlagStore::FeatureFlagStore(QObject* parent)
         : QObject(parent)
@@ -104,4 +104,4 @@ namespace RD
     {
         return new FeatureFlagStore();
     }
-}  // namespace RD
+}  // namespace AA

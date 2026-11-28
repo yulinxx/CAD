@@ -4,7 +4,7 @@
 
 class QHBoxLayout;
 
-namespace RD
+namespace AA
 {
     class IShellHost;
 }
@@ -29,7 +29,7 @@ namespace MS
         Q_OBJECT
 
     public:
-        explicit RightSidePanel(RD::IShellHost* host = nullptr, QWidget* parent = nullptr);
+        explicit RightSidePanel(AA::IShellHost* host = nullptr, QWidget* parent = nullptr);
         ~RightSidePanel() override = default;
 
         RightToolBar* toolBar() const
@@ -50,7 +50,7 @@ namespace MS
         void updatePanelVisibility();
 
     private:
-        RD::IShellHost* m_host = nullptr;
+        AA::IShellHost* m_host = nullptr;
         RightToolBar* m_toolBar = nullptr;
         RightToolWidget* m_toolWidget = nullptr;
         QHBoxLayout* m_layout = nullptr;

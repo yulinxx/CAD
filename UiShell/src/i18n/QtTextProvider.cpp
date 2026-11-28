@@ -5,7 +5,7 @@
 
 #include "i18n/TextContext.h"
 
-namespace RD
+namespace AA
 {
     QString QtTextProvider::text(const QString& key) const
     {
@@ -20,4 +20,4 @@ namespace RD
     {
         return new QtTextProvider;
     }
-}  // namespace RD
+}  // namespace AA

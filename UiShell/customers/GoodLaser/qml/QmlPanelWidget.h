@@ -8,20 +8,20 @@ namespace GL
 {
     // QML 面板容器
     class QmlPanelWidget : public QQuickWidget,
-        public RD::IHostContextAware,
-        public RD::IRetranslatable,
-        public RD::IStatusMessageView
+        public AA::IHostContextAware,
+        public AA::IRetranslatable,
+        public AA::IStatusMessageView
     {
         Q_OBJECT
             Q_PROPERTY(QString msStatusText READ msStatusText NOTIFY sigStatusTextChanged)
 
     public:
-        explicit QmlPanelWidget(const RD::HostContext& context,
+        explicit QmlPanelWidget(const AA::HostContext& context,
             const QString& panelId = QString(),
             QWidget* parent = nullptr);
 
     public:
-        void setHostContext(const RD::HostContext& context) override;
+        void setHostContext(const AA::HostContext& context) override;
         void retranslate() override;
         void showStatusMessage(const QString& text) override;
 
@@ -38,7 +38,7 @@ namespace GL
         void applyContextProperties();
 
     private:
-        RD::HostContext m_context;
+        AA::HostContext m_context;
         QString m_panelId;
         QString m_statusText;
     };

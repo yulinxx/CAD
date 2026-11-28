@@ -4,7 +4,7 @@
 
 class QHBoxLayout;
 
-namespace RD
+namespace AA
 {
     class IShellHost;
 }
@@ -27,7 +27,7 @@ namespace MS
 
     public:
         // host 只用于把工具按钮转成命令调用（非 UI 逻辑不下沉到工具栏控件）。
-        explicit LeftSidePanel(RD::IShellHost* host = nullptr, QWidget* parent = nullptr);
+        explicit LeftSidePanel(AA::IShellHost* host = nullptr, QWidget* parent = nullptr);
         ~LeftSidePanel() override = default;
 
         LeftToolBar* toolBar() const
@@ -46,7 +46,7 @@ namespace MS
         QWidget* makePlaceholder(const QString& toolId);
 
     private:
-        RD::IShellHost* m_host = nullptr;
+        AA::IShellHost* m_host = nullptr;
         LeftToolBar* m_toolBar = nullptr;
         LeftToolWidget* m_toolWidget = nullptr;
         QHBoxLayout* m_layout = nullptr;

@@ -2,7 +2,7 @@
 
 #include <optional>
 
-namespace RD
+namespace AA
 {
     // 顶层窗口的最小尺寸与边框模式。
     // 标题栏形态由平台编译期固定：Windows 自绘，macOS/Linux 原生；
@@ -19,4 +19,4 @@ namespace RD
         // 原生模式下菜单项只有文字。
         std::optional<bool> nativeMenuBar;
     };
-}  // namespace RD
+}  // namespace AA

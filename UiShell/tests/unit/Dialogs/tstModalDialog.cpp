@@ -9,7 +9,7 @@
 
 #include "UiShell/Contract/ModalDialog.h"
 
-using namespace RD;
+using namespace AA;
 
 // runModalDialog：所有对话框工厂（框架默认、共享库、TyvokStudio / GoodLaser）共用的打开方式。
 // 锁住四种结局：没打开、确定、取消、打开期间父窗口被销毁。

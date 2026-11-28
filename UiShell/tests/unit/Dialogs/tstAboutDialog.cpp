@@ -14,8 +14,8 @@
 #include "AboutDialog.h"  // UiDialogs 内部头（dialogs/src）
 #include "UiDialogs/AboutDialogs.h"
 
-using namespace RD;
-using namespace RD::about;
+using namespace AA;
+using namespace AA::about;
 
 namespace
 {

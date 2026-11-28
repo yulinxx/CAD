@@ -1,6 +1,6 @@
 #pragma once
 
-namespace RD
+namespace AA
 {
     class ITitleBarHost
     {
@@ -21,4 +21,4 @@ namespace RD
         // 查询窗口当前是否最大化。
         virtual bool isMaximized() const = 0;
     };
-}  // namespace RD
+}  // namespace AA

@@ -2,7 +2,7 @@
 
 #include "AprilWorkbench.h"
 
-#include "UiShell/Contract/WidgetFactory.h"   // RD::IWidgetFactory / RD::PanelCreateRequest
+#include "UiShell/Contract/WidgetFactory.h"   // AA::IWidgetFactory / AA::PanelCreateRequest
 
 namespace Apr
 {
@@ -14,7 +14,7 @@ namespace Apr
     };
 
     // 把“旧 UI 的界面部分”放进 UiShell 新框架：
-    // 实现 RD::IWidgetFactory，按 panelId 产出现有旧界面部件（AprilUi / UI2D），
+    // 实现 AA::IWidgetFactory，按 panelId 产出现有旧界面部件（AprilUi / UI2D），
     // 而不是重写一个新的。factoryId = "april.panel"。
     //
     // panelId 约定（与 ui.json regions/areas 对应；旧 Workbench2D 用同名面板）：
@@ -26,9 +26,15 @@ namespace Apr
     //   layers            -> SceneTreePanel / 占位 （旧图层面板占位，service 注入后接入）
     // props.kind 是显式的面板类型，优先于 panelId 的历史映射。
     // 未识别 panelId：返回空 QWidget 占位。
-    class PanelFactory : public RD::IWidgetFactory
+    class PanelFactory : public AA::IWidgetFactory
     {
     public:
-        QWidget* create(const RD::PanelCreateRequest& info) override;
+        QWidget* create(const AA::PanelCreateRequest& info) override;
+
+        // 状态栏需要视口坐标反馈；由客户模块注入 workbench，工厂只负责建控件并注册 sink。
+        void setWorkbench(AprilWorkbench* workbench) { m_workbench = workbench; }
+
+    private:
+        AprilWorkbench* m_workbench = nullptr;
     };
 }  // namespace Apr

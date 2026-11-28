@@ -20,7 +20,7 @@
 #include "UiShell/Contract/HostContext.h"
 #include "UiShell/i18n/ITranslationService.h"
 
-namespace RD
+namespace AA
 {
     MenuController::MenuController(const ShellServices* services, CommandActions& actions,
         CBFunc languageHandler, CBFunc themeHandler)
@@ -89,7 +89,7 @@ namespace RD
                 sub->setObjectName(QStringLiteral("msui.menu.") + info.strId);
 
                 if (!info.strIconKey.isEmpty())
-                    sub->menuAction()->setIcon(RD::themedIcon(info.strIconKey));
+                    sub->menuAction()->setIcon(AA::themedIcon(info.strIconKey));
 
                 for (const MenuNodeInfo& child : info.children)
                     funcAppendNode(sub, child);
@@ -110,7 +110,7 @@ namespace RD
 
                 // 顶层菜单图标
                 if (!menuInfo.strIconKey.isEmpty())
-                    menu->menuAction()->setIcon(RD::themedIcon(menuInfo.strIconKey));
+                    menu->menuAction()->setIcon(AA::themedIcon(menuInfo.strIconKey));
 
                 for (const MenuNodeInfo& child : menuInfo.children)
                     funcAppendNode(menu, child);
@@ -133,7 +133,7 @@ namespace RD
         QMenu* langMenu = parent->addMenu(QCoreApplication::translate("LanguageMenu", "Language"));
         langMenu->setObjectName(QStringLiteral("msui.menu.language"));
         if (!iconKey.isEmpty())
-            langMenu->menuAction()->setIcon(RD::themedIcon(iconKey));
+            langMenu->menuAction()->setIcon(AA::themedIcon(iconKey));
 
         auto* group = new QActionGroup(langMenu);
         group->setExclusive(true);
@@ -157,7 +157,7 @@ namespace RD
         QMenu* themeMenu = parent->addMenu(QCoreApplication::translate("ThemeMenu", "Theme"));
         themeMenu->setObjectName(QStringLiteral("msui.menu.theme"));
         if (!iconKey.isEmpty())
-            themeMenu->menuAction()->setIcon(RD::themedIcon(iconKey));
+            themeMenu->menuAction()->setIcon(AA::themedIcon(iconKey));
 
         auto* group = new QActionGroup(themeMenu);
         group->setExclusive(true);
@@ -195,6 +195,11 @@ namespace RD
             return;
         }
 
+        // profile 命令由 CommandActions 的 triggered → ShellRuntime::invoke 统一分发；
+        // 这里只接管内置子菜单自己创建的动作，否则 language.* 会被处理两次。
+        if (action->property("msui.profileCommand").toBool())
+            return;
+
         const QString name = action->objectName();
         if (name.startsWith(strLan))
         {
@@ -211,4 +216,4 @@ namespace RD
                 });
         }
     }
-}  // namespace RD
+}  // namespace AA

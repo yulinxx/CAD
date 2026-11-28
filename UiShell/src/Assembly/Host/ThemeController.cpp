@@ -10,7 +10,7 @@
 
 #include "UiShell/Contract/HostContext.h"
 
-namespace RD
+namespace AA
 {
     namespace
     {
@@ -110,4 +110,4 @@ namespace RD
         app->setStyleSheet(sheets.join(QStringLiteral("\n")));
         return true;
     }
-}  // namespace RD
+}  // namespace AA
