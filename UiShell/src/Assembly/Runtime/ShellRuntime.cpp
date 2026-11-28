@@ -15,6 +15,7 @@
 #include "Assembly/Menus/MenuController.h"
 #include "Assembly/Runtime/ShellView.h"
 #include "Assembly/Dialogs/DialogController.h"
+#include "UiShell/Assembly/ActiveRuntime.h"
 #include "UiShell/Assembly/IRegionContainer.h"
 #include "UiShell/i18n/ITranslationService.h"
 
@@ -58,6 +59,7 @@ namespace RD
     ShellRuntime::ShellRuntime(const ShellServices& services)
         : m_shellServices(services)
     {
+        setActiveRuntime(this);
         rdInitShellResources();
 
         m_dlgCtrl = std::make_unique<DialogController>(&m_shellServices, &m_profilePipeline.profileDir());
@@ -111,6 +113,8 @@ namespace RD
 
     ShellRuntime::~ShellRuntime()
     {
+        if (activeRuntime() == this)
+            setActiveRuntime(nullptr);
         // 先退订开关变化,避免悬空
         if (m_shellServices.featureFlags && m_ftSubscriptionId != 0)
         {

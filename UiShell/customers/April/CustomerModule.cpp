@@ -11,6 +11,7 @@
 
 #include "panels/PanelFactory.h"
 #include "commands/Commands.h"
+#include "commands/OperationCommandSink.h"
 #include "CompositionRoot.h"   // CompositionRootWiring：adapter/viewportFactory 的持有者
 
 // 静态链接时 qrc 资源对象需要显式引用一次，否则可能被链接器丢弃。
@@ -38,6 +39,7 @@ namespace Apr
             CenterView centerView;
             PanelFactory panels;
             Commands commands;
+            OperationCommandSink commandSink;
             // 组合根 + adapter + viewportFactory 必须与 centerView 同寿命：
             // 早期把 adapter 放在栈上，导致 AprilShell 一加载 profile 就悬空崩溃。
             CompositionRootWiring wiring;
@@ -92,19 +94,19 @@ namespace RD
         // 通用契约：每个客户都注册共享默认对话框工厂；April 不覆盖具体实现。
         module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::about::kAboutDlgId), &parts->aboutDialog });
         module.listDlgFactoriesBind.append({ QString::fromLatin1(RD::samples::kSampleParamsDlgId), &parts->sampleParams });
-        // 示例命令仅登记元数据，使共享集成测试可发现；实际执行仍由 AprilUi 的 IUiCommandDispatcher 分发。
+        // 示例命令仅登记元数据，使共享集成测试可发现；实际执行由客户侧命令出口分发。
         parts->commands.addCommand(RD::CommandView{ QString::fromLatin1(RD::samples::kSampleRunCmdId) });
 
-        // #2 组合根接线：AprilShell -> ApplicationCompositionRoot::build()
-        //   -> AprilWorkbench::bindCompositionRoot + Commands::setDispatcher(UiWorkbench)
+        // #2 组合根接线：April -> ApplicationCompositionRoot::build()
+        //   -> AprilWorkbench::bindViewportServices + Commands::setSink(OperationCommandSink)
         // 不抛；build()/接线失败返回 built/wired=false（见 CompositionRoot.h）。
-        attachCompositionRoot(parts->centerView, parts->commands, parts->wiring);
+        attachCompositionRoot(parts->centerView, parts->commands, parts->wiring, parts->commandSink);
         // M3：centerView 是 Apr::CenterView（: Apr::AprilWorkbench），
         // createCenterView 返回现有 RenderViewport2D / Viewport3D；
         // 视口服务由本客户持有并注入；与 UiShell ShellServices 互转。
-        // M4：命令表用 Apr::Commands 适配现有 IUiCommandDispatcher / OperationBus；
+        // M6：命令表用 Apr::Commands 适配现有 OperationBus + UiShell 外壳命令；
         // 同时提供 ICommandCatalog / ICommandInvoker / ICommandState。
-        // dispatcher（现有 UiWorkbench）由 customers/April 在装配完工作台后注入。
+        // dispatcher 不再来自旧 WorkbenchWindow/UiWorkbench。
 
         return module;
     }

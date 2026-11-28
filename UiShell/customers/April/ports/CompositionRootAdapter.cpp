@@ -2,9 +2,7 @@
 
 // ---- AprilCore ----
 #include "Composition/ApplicationCompositionRoot.h"
-#include "UI/Services/UiShellHost.h"
-#include "UI/Workbench/WorkbenchWindow.h"
-#include "UI/Workbench/UiWorkbench.h"
+#include "commands/OperationCommandSink.h"
 #include <QVariantMap>
 
 namespace Apr
@@ -70,10 +68,9 @@ namespace Apr
     }
     bool CompositionRootAdapter::dispatchOperation(const QString& commandId)
     {
-        if (!m_root || !m_root->isBuilt() || !m_root->shellHost() || !m_root->shellHost()->mainWindow()
-            || !m_root->shellHost()->mainWindow()->currentWorkbench())
+        if (!m_root || !m_root->isBuilt() || !m_commandSink || !m_commandSink->isRegistered(commandId))
             return false;
-        m_root->shellHost()->mainWindow()->currentWorkbench()->dispatch(commandId, QVariantMap{});
+        m_commandSink->dispatch(commandId, QVariantMap{});
         return true;
     }
 

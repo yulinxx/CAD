@@ -10,6 +10,7 @@
 #include "i18n/TranslationSetup.h"
 #include "Launcher/StartupSession.h"
 
+#include "UiShell/Assembly/HostWindow.h"
 #include "UiShell/Assembly/ShellServices.h"
 #include "UiShell/Contract/BuildFingerprint.h"
 #include "UiShell/Contract/CustomerModule.h"
@@ -38,6 +39,10 @@ int AppBootstrap::start(QMainWindow* window)
 {
     if (!window)
         return kExitAttach;
+
+    // 客户模块装配服务时需要主窗口指针；必须在 createCustomerModule() 之前发布，
+    // 且不能跨 CRT 传 STL 对象。
+    RD::setHostMainWindow(window);
 
     // 先加载翻译服务，再加载客户模块
     m_transSetup = std::make_unique<TranslationSetup>();

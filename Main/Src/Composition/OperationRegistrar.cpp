@@ -18,9 +18,8 @@
 #include "Engine2D/Interaction/LayerManager.h"
 #include "Engine/Process/ProcessParams.h"
 
-// UiShellHost::mainWindow() 返回 WorkbenchWindow*，转 QWidget* 需要完整类型
-#include "UI/Workbench/WorkbenchWindow.h"
 
+#include <QMainWindow>
 #include <QMessageBox>
 
 #include "Log/AprLogger.h"
@@ -160,7 +159,7 @@ void OperationRegistrar::registerAll()
         m_root.stateCenter(),
         m_root.layerEditService(),
         m_root.unitManager(),
-        m_root.shellHost() ? m_root.shellHost()->mainWindow() : nullptr,
+        m_root.mainWindow(),
         m_root.uiServices().view.captureService);
 
     coreOps.registerAll();
@@ -177,7 +176,7 @@ void OperationRegistrar::registerAll()
     fileConfig.stateCenter = m_root.stateCenter();
     fileConfig.layerPersistence = m_root.layerPersistenceBridge();
     fileConfig.persistence = m_root.persistenceService();
-    fileConfig.parentWidget = m_root.shellHost() ? m_root.shellHost()->mainWindow() : nullptr;
+    fileConfig.parentWidget = m_root.mainWindow();
     // 新建/打开时清空撤销栈：跨文档撤销会把上一份文档的图元插回新文档
     fileConfig.undoRedoManager = m_root.undoRedoManager();
 
@@ -192,10 +191,10 @@ void OperationRegistrar::registerAll()
     laserConfig.safetyController = m_root.emergencyStopController();
     laserConfig.sceneManager = m_root.sceneManager();
     laserConfig.layerManager = m_root.layerManager();
-    laserConfig.errorReporter = [host = m_root.shellHost()](const QString& message) {
+    laserConfig.errorReporter = [window = m_root.mainWindow()](const QString& message) {
         // 加工失败必须让操作员看见：只写日志的话，
         // 现场表现是「按了开始加工什么都没发生」
-        QMessageBox::warning(host ? host->mainWindow() : nullptr, QObject::tr("Processing"), message);
+        QMessageBox::warning(window, QObject::tr("Processing"), message);
     };
     // 作业规格：把机器坐标系从设备档案注入，同时从 LayerManager +
     // HardwareProfileManager 读取各图层工艺参数（功率/速度/遍数），

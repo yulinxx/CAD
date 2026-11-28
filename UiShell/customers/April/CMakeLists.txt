@@ -13,6 +13,11 @@ if(TARGET AprilUi)
     target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE AprilUi)
 endif()
 
+# M6：客户命令出口通过 UiShell 发布的宿主主窗口/活动运行时访问外壳能力。
+if(TARGET ${UI_SHELL_TARGET})
+    target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE ${UI_SHELL_TARGET})
+endif()
+
 # M3.5：AprilUi 引用非 UI 符号；链接 AprilCore 让 UiApril / AprilShell 独立链接。
 if(TARGET AprilCore)
     target_link_libraries(${UI_CUSTOMER_TARGET} PRIVATE AprilCore)

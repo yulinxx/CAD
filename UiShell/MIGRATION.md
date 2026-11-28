@@ -2,11 +2,11 @@
 
 > **状态唯一事实源：本文。** `Docs/01-当前架构/UiShell框架迁移.md` 只做摘要并回指本文。
 >
-> 当前状态（2026-11-27）：M0–M4 的**框架/脚手架**（契约层、shell 运行时、
-> `UiDialogs`、客户库、ports & adapters、命令适配）已落地；M3 已修掉一个真实的
-> 启动崩溃（悬空 adapter），视口服务改为经 port 真注入；**M3 交互运行时 / M4
-> 菜单运行时仍未验收**（`IUiCommandDispatcher` 接线、`configs/base.json` → `ui.json`
-> 菜单转换）；M5 数据化已完成（profile 驱动品牌/关于框/六套主题/默认语言/外置资源），M6 未完成。
+> 当前状态（2026-11-28）：M0–M6 已完成。M0–M4 的框架/脚手架（契约层、shell 运行时、
+> `UiDialogs`、客户库、ports & adapters、命令适配）已落地；M3 修掉了栈上 adapter 悬空导致的
+> 启动崩溃；M5 数据化已完成（profile 驱动品牌/关于框/六套主题/默认语言/外置资源）；
+> M6 已把 `April` 生产入口切到 UiShell `AppBootstrap`，旧 UI 实现移到测试专用目录。
+> **M3 2D 交互语义与 M4 菜单点击/快捷键的真实 GUI 运行时验收仍待补**（offscreen 环境限制，见 §0.5）。
 > `SampleFrame/` 是只读参考工程，任何改动都不落到该目录。
 >
 > 目标是把现有 `Main` 的 UI 外壳改成 SampleFrame 的架构：`UiContract` 契约层 +
@@ -18,9 +18,11 @@
 
 1. 新外壳 `UiShell/` 先作为根工程子目录存在，旧 `April` 应用保持可运行；
 2. 每迁移一块，就在新外壳里替换掉一块旧实现；
-3. 全部功能对齐后，`April` 入口改为链接新外壳，最后删除 `Main/Src/UI`。
+3. 全部功能对齐后，`April` 入口改为链接新外壳（M6 已完成）；旧 UI 生产副本移到
+   `Main/Src/UI/Test/LegacyUI/`，只由 `MainTests` 编译，视为生产侧删除。
 
-回滚方式：`-DBUILD_UI_SHELL=OFF` 即回到迁移前状态，旧 `April` 不受影响。
+回滚方式：`-DBUILD_UI_SHELL=OFF` 回到未启用新外壳的构建形态；M6 后的完整生产回退需要恢复
+   旧入口源文件（已删除）与旧 UI 生产路径（现位于测试专用目录）。
 
 ## 0.5 Step 0 基线（已验证，2026-11-27）
 
@@ -146,7 +148,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
    `nm -C April` 能看到 `WorkbenchWindow::*` 等 `AprilUi` 符号；
 6. `Engine` 子模块 WIP 已 `stash pop` 恢复原样。
 
-**注**：`MainTests` 仍编译全部源码，未切到链接 `AprilUi`（见“本轮未做”）。
+**注**：`MainTests` 仍编译全部源码（含 M6 起位于测试专用目录的旧 UI），未切到链接 `AprilUi`（见 §3 M6）。
 
 
 ### M2：建立 `customers/April` 客户模块（已完成，2026-11-27）
@@ -161,7 +163,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
     **M3** 改为返回现有 CAD 工作台/视口宿主。
   - `ui.json`：version 2 最小集（titlebar / menubar / CenterView / StatusBar）。
 - `UiProjectDefaults.cmake`：`UI_CUSTOMER` 增加 `April`；`UI_CUSTOMER_TARGET=UiApril`；
-  customer 目录 `customers/April`；宿主 EXE 用 **`AprilShell`**（避免与 `Main` 的 `April` 目标冲突；M6 切换入口前不替换现有 `April`）。
+  customer 目录 `customers/April`；宿主 EXE 用 **`AprilShell`**（避免与 `Main` 的 `April` 目标冲突；M6 已同时把 `April` 生产入口切到同一 `AppBootstrap` 流程）。
 - `UiApril`（`msUiAddCustomerLibrary`）链接 `AprilUi`（`if(TARGET AprilUi)`）。
 
 **暂未做（后续里程碑）**：
@@ -169,9 +171,10 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 - `commands/Commands.*`：`ICommandCatalog` / `ICommandInvoker` → 现有命令表（**M4 已完成**，见 §3）。
 - `ui.json` 由 `configs/base.json` + `april.json` 转换（**M4 已完成**：8 菜单覆盖 base.json 全部 id；`panels` 仍为空，属 M5）。
 - `assets/`、`translations/`（**M5**）。
-- 完整资源注册：`AprilUi` 里的 `:/configs/...` 等 CAD 资源目前只在 `April` 可执行目标里注册；
-  `AprilShell` 的 CAD 资源注册在 **M5/M6** 处理（M2 空中央视图不依赖它们，已可构建/启动）。
-- 完整 exe 替换（**M6**）。
+- 完整资源注册：`AprilUi` 里的 `:/configs/...` 等 CAD 资源在 `April` 可执行目标注册；
+  `AprilShell` 的 profile/translations/运行时资源在 **M6** 由 `UiShell/CMakeLists.txt` 的
+  `AprilRuntimeDeploy ALL` 统一部署（M2 空中央视图不依赖它们，当时已可构建/启动）。
+- 完整 exe 替换（**M6 已完成**）。
 
 **验收（临时 stash `Engine` WIP，用已提交 Engine 状态；验证后已 `stash pop` 恢复 50 文件）**：
 
@@ -219,7 +222,8 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   `wireCompositionRoot()` 经 `IViewportServices` 真注入，并把 `SceneDocument2D` /
   `OperationBus` / `ISelectionService` / `LayerManager` 转发给 `DefaultViewportFactory`；
   不再有栈上悬空指针。
-- **资源注册**：`AprilUi` 的 `:/configs/...` 等仍在 `April` 可执行目标注册；`AprilShell` 的 CAD 资源在 **M5/M6**。
+- **资源注册**：`AprilUi` 的 `:/configs/...` 等在 `April` 可执行目标注册；`AprilShell` 的
+  profile/translations/运行时资源由 M6 的 `AprilRuntimeDeploy ALL` 部署。
 - **验收（待真实窗口环境）**：2D 绘图、选择、变换、撤销重做在新外壳内可用；offscreen 无法创建 `MetalSurface`，不能作为此项验收环境。
 - **`--profile`**：`StartupSession` 现支持 `--profile <path>` / `--profile=<path>`，显式路径优先且不存在即失败，冒烟脚本依赖该约定。
 
@@ -230,10 +234,11 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 **做法**（`UiShell/customers/April`）：
 
 - 新增 `commands/Commands.{h,cpp}`：`Apr::Commands : RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState`
-  - `find()`；`invoke()` → `IUiCommandDispatcher::dispatch(commandId, {})`；
+  - `find()`；`invoke()` → `ICommandSink::dispatch(commandId, {})`；
     `invokeWithArgs()` → `dispatch(commandId, QJsonObject→QVariantMap)`（透传/补齐，不整体覆盖）；
-  - `queryState()` → `isCommandRegistered` → `bEnabled`；`addCommand(RD::CommandView)`；`setDispatcher()`；
-  - **不重写命令系统**，复用 `AprilUi` 的 `IUiCommandDispatcher`（`UiWorkbench` 实现）/ `OperationBus` / `OperationRegistry`。
+  - `queryState()` → `isCommandRegistered` → `bEnabled`；`addCommand(RD::CommandView)`；`setSink()`；
+  - **不重写命令系统**，复用 `CommandCatalog` / `OperationRouting` / `OperationBus` / `OperationRegistry`。
+    M6 后生产路径不再经过旧 `IUiCommandDispatcher`。
 - `CustomerModule.cpp`：`ModuleParts` 持有 `Commands commands`；`module.cmdCatalog/cmdInvoker/cmdState = &parts->commands`。
 - `AprilWorkbench::applyShellServices` / `populateShellServices` 已转发 `cmdCatalog/cmdInvoker/cmdState`。
 - **菜单转换已完成**：`customers/April/ui.json` 的 8 个菜单覆盖 `configs/base.json` 的全部 184 个 id
@@ -252,13 +257,13 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 
 **暂未做**：
 
-- `setDispatcher()` 已在 `wireCompositionRoot()` 中接线（`UiWorkbench` 实现 `IUiCommandDispatcher`），
-  但指针取自 `UiShellHost::mainWindow()->currentWorkbench()`，未 setWorkbench 时为空；
-  `UiApril` 单独 dylib 链接仍受“`AprilUi` 引用 `Main` 非 UI 符号 / 组合根”缺口影响（见 M3 注）。
+- M6 后命令出口改为 `ICommandSink` / `OperationCommandSink`：主题、语言、`help.about`、
+  `view.switch_to_*` 走 `IShellRuntime`，2D 命令走 `CommandCatalog` / `OperationRouting` /
+  `OperationBus`；不再依赖 `UiShellHost` / `UiWorkbench`，`UiApril` 可单独构建与链接。
 - 菜单点击/工具栏/面板按钮/快捷键“走同一条命令路径”的**运行时验收**，待真实窗口环境验证
   （offscreen 下完整 profile 会崩在 `MetalSurface`，见 §0.5）。
 
-### M5：品牌、主题、i18n、部署（数据化完成，旧入口待 M6）
+### M5：品牌、主题、i18n、部署（数据化完成）
 
 - **品牌元数据**：profile 新增可选 `brand` 段（`product` / `organization` / `icon` / `theme` /
   `language` / `copyright` / `website` / `email` / `license` / `logo`）；`ProfileParser` 校验类型
@@ -282,21 +287,42 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   标题/图标/皮肤、关于框品牌参数覆盖优先级、六套皮肤全部可应用；端到端用临时 profile
   （含 `assets/` + `styles/`）启动 `AprilShell`（offscreen + 最小 profile），事件循环正常、
   unknown-command 告警 0。
-- **未做**：`Main/Src/UI/WorkbenchWindow.cpp` 等旧硬编码仍留在旧 `April` 可执行文件的路径上，
-  待 M6 切入口后处理；旧 `UICommon` 的六套 QSS 未逐字搬入，UiShell 用的是等价的薄差异层。
+- **旧 UI 硬编码**：`WorkbenchWindow.cpp` 等无需再抄进 UiShell；M6 已把它们移出生产路径，
+  仅保留在测试专用副本中。旧 `UICommon` 的六套 QSS 未逐字搬入，UiShell 用的是等价的薄差异层。
 
-### M6：切换入口，删除旧 Main
+### M6：切换入口，旧 UI 生产路径删除（已完成，2026-11-28）
 
-- `April` 入口改为 `UiShell/main` 的 `AppBootstrap` 流程。
-- 删除 `Main/Src/UI/ClientConfig`、`Workbench*` 等已被替代的实现。
-- 保留 `Main/Src/Composition` 等仍在使用的服务，直到完全迁移。
-- 验收：全量回归 + 打包脚本产出可运行目录。
+- **生产入口**：`April` 目标改用 `UiShell/main/main.cpp` 的 `AppBootstrap`，定义
+  `APR_PRODUCT_STARTUP=1` 以调用 `AprilShellStartup` 中的产品专属前置逻辑（OpenGL/macOS、CLI、
+  初始化、资源、崩溃处理、授权、退出保存、关停）；`AprilShell` 仍是不带产品钩子的薄 EXE。
+  旧的 `main.cpp`、`AppBootstrapper.*`、`CADApplicationEntry.cpp`、`CADApplicationRuntime.*` 已删除。
+- **宿主注入**：`AppBootstrap` 在创建客户模块前通过 `IHostWindow` 发布宿主 `QMainWindow`；
+  `ShellRuntime` 通过 `IActiveRuntime` 发布当前运行时。`ApplicationCompositionRoot` 去掉
+  `UiShellHost` 成员，改为消费主窗口；`OperationRegistrar` 已从 `m_root.mainWindow()` 取窗口。
+- **命令出口**：`OperationCommandSink`（轻量接口 `ICommandSink`）替代 `IUiCommandDispatcher`，
+  使独立菜单目录测试仍只需编译 `Commands.cpp`。`CompositionRootAdapter::dispatchOperation()`
+  也委托给该 sink。
+- **测试专用旧 UI**：`UI/ClientConfig`、`UI/Workbench`、`UiShellHost`、`DevicePanel` 等的
+  实现/头文件移到 `Main/Src/UI/Test/LegacyUI/`；生产源集合和 qrc 过滤 `/Test/`，`MainTests`
+  显式加入这些源码与 include 目录，原有覆盖继续运行。`Workbench3D.cpp` 里用户 WIP 的
+  `setCompletionCallback` → `OperationBus::notifyOperationCompleted` 回调随重命名保留。
+- **服务边界**：生产 `UiFeatureGate` 移到 `Main/Src/UI/Services/`，测试侧保留兼容头；
+  `LicensingBootstrap.cpp` 改用新 include。
+- **部署**：根 CMake 的部署调用因目标目录限制改由 `UiShell/CMakeLists.txt` 的
+  `AprilRuntimeDeploy ALL` 承接，随 `April` 部署 profile/translations/运行时资源；安装规则
+  同步安装 `UiShell`/`UiApril` 动态库与 `profile/`，避免装出来的 `April` 缺库或缺 ui.json。
+- **验收**：`BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh` 通过（25/25 层检/单测 +
+  `AprilShell smoke OK`）；`cmake --build build` 全目标构建通过；`Tools/package_smoke_test.py`
+  的 staged 安装/运行/升级/卸载冒烟通过。默认 `-DUI_CUSTOMER=MantiSoft` 不生成
+  `AprilShell` / `UiApril`。全量 `ctest` 为 4881/4891 通过；10 个失败集中在 SY 格式注册、
+  Raster/CAM 运动规划与 Hardware 加工链路径（M6 未触碰，且与用户 WIP 子模块改动一致），
+  需在这些 WIP 合入前单独复位验证。
 
 ## 4. 验收标准（每个里程碑都要满足）
 
 1. `cmake -S . -B build -DBUILD_UI_SHELL=ON` 配置成功；
 2. `ctest --test-dir build -R "UiTst|UiLayerCheck"` 全绿；
-3. 旧 `April` 仍可构建、启动（M6 之前）；
+3. `April` 仍可构建、启动（M6 后与新外壳共用 `AppBootstrap`）；
 4. 新外壳的 `UiLayerCheck` 不出现越界 include；
 5. 不引入客户分支（`if (customer == ...)`）。
 
@@ -317,16 +343,15 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 - `AprilCore`(算法) 不链 `UiShell`；UI 经 `RD::ICommand*` + `Apr::ICadViewport` + `Apr::IViewportServices` + `OperationBus`/`SceneDocument2D` 契约，不直接改 `SceneManager`。
 - `Apr::IViewportFactory` + `Apr::RenderViewport2DAdapter`(2D) + `Apr::Viewport3DAdapter`(3D) + `Apr::CompositionRootAdapter`；旧 `RenderViewport2D`/`Viewport3D`/`ApplicationCompositionRoot` 关进 adapter。
 - `customers/April` 唯一耦合 `AprilUi`/`AprilCore`；`UiShell` 不见。
-- `AprilShell` 不 `Main::AppBootstrapper`。
-- 仍：`AprilWorkbench` customer 层持有服务用于适配；M3 交互运行时 / M5/M6 未完成。
+- `AprilShell` 与 M6 后的 `April` 都不依赖 `Main::AppBootstrapper`（已删除）。
+- 仍：`AprilWorkbench` customer 层持有服务用于适配；M3 交互运行时 / M4 菜单点击运行时待真实 GUI 验收。
 
 同步 `Docs/01-当前架构/UiShell框架迁移.md`。
 
 ## 6. 本轮未做的事
 
-- 没有删除或修改 `Main/` 的任何源码；
 - M3 的 2D 交互与 M4 的菜单点击/快捷键运行时验收，仍待真实 GUI 会话（offscreen 限制见 §0.5）；
-- M5 的旧 `Main` 品牌硬编码清理尚未开始（UiShell 侧六套主题已可用）；
-- M6 的 `April` 入口切换与旧 UI 删除尚未开始。
+- 生产路径未搬入旧 `UICommon` 的 QSS 原文；UiShell 使用数据化 profile 与等价的薄差异层；
+- 未修改 `SampleFrame/`，未触碰用户 WIP（`.gitignore`、`Tools/`、小写子模块、`Docs/00-*`、`Docs/06-*`）。
 
-后续按 M6 推进，并在真实 GUI 会话补 M3/M4 运行时验收。
+后续在真实 GUI 会话补 M3/M4 运行时验收。

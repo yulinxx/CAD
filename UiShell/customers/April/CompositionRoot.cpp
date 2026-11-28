@@ -3,26 +3,26 @@
 #include "panels/AprilWorkbench.h"
 #include "ports/CompositionRootAdapter.h"
 #include "commands/Commands.h"
+#include "commands/OperationCommandSink.h"
 
 // ---- AprilCore ----
 #include "Composition/ApplicationCompositionRoot.h"
 
-// ---- AprilUi ----
-#include "UI/Services/UiShellHost.h"          // UiShellHost::mainWindow
-#include "UI/Workbench/WorkbenchWindow.h"     // WorkbenchWindow::currentWorkbench
-#include "UI/Workbench/UiWorkbench.h"          // UiWorkbench : public IUiCommandDispatcher
+// ---- UiShell ----
+#include "UiShell/Assembly/HostWindow.h"
 
 namespace Apr
 {
-    void attachCommandDispatcher(Commands& commands, IUiCommandDispatcher* dispatcher)
+    void attachCommandSink(Commands& commands, ICommandSink* sink)
     {
-        commands.setDispatcher(dispatcher);
+        commands.setSink(sink);
     }
 
     bool wireCompositionRoot(ApplicationCompositionRoot& root,
                              AprilWorkbench& workbench,
                              Commands& commands,
-                             CompositionRootAdapter& adapter)
+                             CompositionRootAdapter& adapter,
+                             OperationCommandSink& sink)
     {
         if (!root.isBuilt())
             return false;
@@ -42,25 +42,24 @@ namespace Apr
         workbench.setViewportFactory(adapter.viewportFactory()); // Apr::IViewportFactory -> Apr::DefaultViewportFactory
         const bool viewportWired = adapter.hasSceneDocument2D() || adapter.hasOperationBus() || adapter.hasUiServices();
 
-        // 命令分发注入：现有 UiWorkbench（: public IUiCommandDispatcher）
-        IUiCommandDispatcher* dispatcher = nullptr;
-        UiWorkbench* wb = nullptr;
-        if (root.shellHost() && root.shellHost()->mainWindow()
-            && root.shellHost()->mainWindow()->currentWorkbench())
-        {
-            wb = root.shellHost()->mainWindow()->currentWorkbench();
-        }
-        if (wb)
-            dispatcher = dynamic_cast<IUiCommandDispatcher*>(wb);
+        // M6：命令不再经 WorkbenchWindow/UiWorkbench。客户侧 OperationCommandSink
+        // 直接把 2D 命令交给 OperationBus，把 theme/language/help 交回 UiShell。
+        sink.setBus(root.operationBus());
+        sink.setWorkbenchSwitch([&workbench](const QString& commandId) {
+            workbench.setViewportKind(commandId == QLatin1String("view.switch_to_3d")
+                ? ViewportKind::ThreeD
+                : ViewportKind::TwoD);
+        });
+        adapter.setCommandSink(&sink);
+        attachCommandSink(commands, &sink);
 
-        attachCommandDispatcher(commands, dispatcher);
-
-        return viewportWired;   // 命令 dispatcher 可为 null（未 setWorkbench），不算失败
+        return viewportWired;
     }
 
     bool attachCompositionRoot(AprilWorkbench& workbench,
                                Commands& commands,
                                CompositionRootWiring& wiring,
+                               OperationCommandSink& sink,
                                ApplicationCompositionRoot* existing)
     {
         ApplicationCompositionRoot* root = existing;
@@ -71,6 +70,9 @@ namespace Apr
             wiring.ownedRoot = std::make_unique<ApplicationCompositionRoot>();
             root = wiring.ownedRoot.get();
         }
+
+        // M6：主窗口由 UiShell 在 createCustomerModule() 之前发布；组合根只借用指针。
+        root->setMainWindow(RD::hostMainWindow());
 
         // 尝试装配（幂等；已 build 直接返回 true）
         if (!root->isBuilt())
@@ -86,7 +88,7 @@ namespace Apr
         if (!wiring.adapter)
             wiring.adapter = std::make_unique<CompositionRootAdapter>(*root);
 
-        wiring.wired = wireCompositionRoot(*root, workbench, commands, *wiring.adapter);
+        wiring.wired = wireCompositionRoot(*root, workbench, commands, *wiring.adapter, sink);
         return wiring.wired;
     }
 }  // namespace Apr

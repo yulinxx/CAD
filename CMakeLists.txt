@@ -598,12 +598,36 @@ if(APR_PYTHON_HOST)
     list(APPEND APR_PROJECT_LIBS PythonHost)
 endif()
 
+# M6：`April` 现在链接外壳与客户 DLL；装出来的程序必须带上它们，
+# 否则 `cmake --install` 的产物仍会在 dyld/加载器阶段直接缺库退出。
+if(BUILD_UI_SHELL AND UI_CUSTOMER STREQUAL "April")
+    list(APPEND APR_PROJECT_LIBS UiShell UiApril)
+endif()
+
 # 安装所有项目 DLL/SO 文件
 install(TARGETS ${APR_PROJECT_LIBS}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION bin
     ARCHIVE DESTINATION lib
 )
+
+# M6：April 的生产 profile 由 UiShell 部署在可执行文件旁；安装树也要保留，
+# 否则装出来的 April 找不到 ui.json（内嵌资源仅作为兜底）。
+if(BUILD_UI_SHELL AND UI_CUSTOMER STREQUAL "April")
+    if(APPLE)
+        install(DIRECTORY "$<TARGET_BUNDLE_CONTENT_DIR:April>/profile"
+            DESTINATION "${PROJECT_NAME}.app/Contents/MacOS"
+            COMPONENT Runtime
+            OPTIONAL
+        )
+    else()
+        install(DIRECTORY "$<TARGET_FILE_DIR:April>/profile"
+            DESTINATION bin
+            COMPONENT Runtime
+            OPTIONAL
+        )
+    endif()
+endif()
 
 # 安装 PyBindCore 模块
 if(APR_PYBIND_CORE AND APR_PYTHON_HOST)

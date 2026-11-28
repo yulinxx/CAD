@@ -793,6 +793,16 @@ void Workbench3D::setup3DMenuAndShortcuts(WorkbenchWindow& window)
     own.commandActionHub = std::make_unique<CommandActionHub3D>(mainWindow3D);
     own.algorithmRunner = std::make_unique<AlgorithmRunner3D>(
         own.algorithmService.get(), m_sceneManager3D, own.sceneEditService.get(), mainWindow3D);
+    if (own.algorithmRunner && own.operationBus)
+    {
+        own.algorithmRunner->setCompletionCallback(
+            [bus = own.operationBus.get()](OperationId3D id, bool success, const QString& message) {
+                if (bus)
+                {
+                    bus->notifyOperationCompleted(id, success, message);
+                }
+            });
+    }
     m_services3D.commandActionHub = own.commandActionHub.get();
     m_services3D.algorithmRunner = own.algorithmRunner.get();
     if (own.settingsCoordinator)

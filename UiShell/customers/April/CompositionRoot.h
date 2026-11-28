@@ -6,12 +6,12 @@
 #include "Composition/ApplicationCompositionRoot.h"
 #include "ports/CompositionRootAdapter.h"
 
-class IUiCommandDispatcher;   // AprilUi / Main: 全局接口，本头不 include，只转发指针
-
 namespace Apr
 {
     class AprilWorkbench;
     class Commands;
+    class ICommandSink;
+    class OperationCommandSink;
 
     // #2 组合根接线结果
     struct CompositionRootWiring
@@ -25,27 +25,28 @@ namespace Apr
         std::unique_ptr<CompositionRootAdapter> adapter;
 
         bool built = false;                                     // root->isBuilt()
-        bool wired = false;                                     // bindCompositionRoot + setDispatcher 已调用
+        bool wired = false;                                     // bindViewportServices + setSink 已调用
     };
 
-    // 对已 build() 的 root 接线：
-    //   AprilWorkbench::bindCompositionRoot(root)
-    //   Commands::setDispatcher( root.shellHost()->mainWindow()->currentWorkbench() )   // UiWorkbench : IUiCommandDispatcher
+    // 对已 build() 的 root 接线：视口服务 + 客户侧 OperationCommandSink。
+    // 不再读取 WorkbenchWindow/UiWorkbench（M6 起它们只存在于测试专用目录）。
     bool wireCompositionRoot(ApplicationCompositionRoot& root,
                              AprilWorkbench& workbench,
                              Commands& commands,
-                             CompositionRootAdapter& adapter);
+                             CompositionRootAdapter& adapter,
+                             OperationCommandSink& sink);
 
-    // 低耦合：UiShell 不知道 Main。customers/April 自己提供 IUiCommandDispatcher* 并注入 Commands。
+    // 低耦合：UiShell 不知道 Main。customers/April 自己提供命令出口并注入 Commands。
     // 传 nullptr 可清空。不要求 ApplicationCompositionRoot::instance()->isBuilt()。
-    void attachCommandDispatcher(Commands& commands, IUiCommandDispatcher* dispatcher);
+    void attachCommandSink(Commands& commands, ICommandSink* sink);
 
-    // #2 全链路：AprilShell -> ApplicationCompositionRoot::build() -> bindCompositionRoot + setDispatcher。
+    // #2 全链路：April/AprilShell -> ApplicationCompositionRoot::build() -> bindViewportServices + setSink。
     //   existing 非空用它；否则优先 ApplicationCompositionRoot::instance()；都没有则自建一个。
-    //   若 root 尚未 build()，尝试 root->build()（需 UiShellHost::mainWindow() 非空 + AppInitializer/PersistenceService 已就绪）。
+    //   若 root 尚未 build()，尝试 root->build()（需 UiShell 已发布宿主主窗口；持久化服务允许为空）。
     //   build()/接线失败不抛，返回 built/wired=false，调用方自行决定。
     bool attachCompositionRoot(AprilWorkbench& workbench,
                                Commands& commands,
                                CompositionRootWiring& wiring,
+                               OperationCommandSink& sink,
                                ApplicationCompositionRoot* existing = nullptr);
 }  // namespace Apr

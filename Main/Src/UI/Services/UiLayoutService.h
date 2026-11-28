@@ -2,7 +2,7 @@
 
 #include <QString>
 
-class WorkbenchWindow;
+class QMainWindow;
 
 /**
  * @file UiLayoutService.h
@@ -25,12 +25,12 @@ public:
     /// 保存布局快照
     /// @param workbenchId 工作台 ID
     /// @param window 主窗口指针
-    virtual void saveLayout(const QString& workbenchId, WorkbenchWindow* window) = 0;
+    virtual void saveLayout(const QString& workbenchId, QMainWindow* window) = 0;
 
     /// 恢复布局快照
     /// @param workbenchId 工作台 ID
     /// @param window 主窗口指针
-    virtual void restoreLayout(const QString& workbenchId, WorkbenchWindow* window) = 0;
+    virtual void restoreLayout(const QString& workbenchId, QMainWindow* window) = 0;
 };
 
 /**
@@ -42,6 +42,6 @@ public:
 class DefaultUiLayoutService final : public UiLayoutService
 {
 public:
-    void saveLayout(const QString& workbenchId, WorkbenchWindow* window) override;
-    void restoreLayout(const QString& workbenchId, WorkbenchWindow* window) override;
+    void saveLayout(const QString& workbenchId, QMainWindow* window) override;
+    void restoreLayout(const QString& workbenchId, QMainWindow* window) override;
 };

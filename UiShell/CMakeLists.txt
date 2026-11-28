@@ -34,6 +34,66 @@ add_subdirectory(dialogs)
 add_subdirectory("customers/${_UI_customer_dir}")
 add_subdirectory(main)
 
+# ---------------------------------------------------------------------------
+# M6：产品目标 April 现在直接用 UiShell/main 入口，但目标在 Main/ 子目录创建，
+# UiDeployRuntime() 的 POST_BUILD 助手要求目标与调用在同一目录，因此这里用
+# 一个 ALL 自定义目标承担 April 的运行期部署（与 AprilShell 的部署互不干扰）。
+# ---------------------------------------------------------------------------
+if(UI_CUSTOMER STREQUAL "April" AND TARGET April AND TARGET ${UI_CUSTOMER_TARGET})
+    get_target_property(_april_profile_dir ${UI_CUSTOMER_TARGET} UI_PROFILE_DIR)
+    set(_april_deploy_cmds
+        COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:April>/translations")
+    if(UI_QM_FILES)
+        list(APPEND _april_deploy_cmds
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${UI_QM_FILES} "$<TARGET_FILE_DIR:April>/translations")
+    endif()
+    if(_april_profile_dir AND NOT _april_profile_dir MATCHES "-NOTFOUND$")
+        list(APPEND _april_deploy_cmds
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:April>/profile"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${_april_profile_dir}/ui.json" "$<TARGET_FILE_DIR:April>/profile/ui.json")
+        foreach(_subdir assets styles translations)
+            if(IS_DIRECTORY "${_april_profile_dir}/${_subdir}")
+                list(APPEND _april_deploy_cmds
+                    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                        "${_april_profile_dir}/${_subdir}" "$<TARGET_FILE_DIR:April>/profile/${_subdir}")
+            endif()
+        endforeach()
+    endif()
+
+    set(_april_qml_args "")
+    if(UI_BUILD_SHARED)
+        get_target_property(_april_qml_dir ${UI_CUSTOMER_TARGET} UI_QML_DIR)
+        if(_april_qml_dir AND NOT _april_qml_dir MATCHES "-NOTFOUND$")
+            set(_april_qml_args --qmldir "${_april_qml_dir}")
+        endif()
+    endif()
+
+    if(WIN32 AND UI_DEPLOY_QT AND UI_QT_BIN_DIR)
+        set(_windeployqt "${UI_QT_BIN_DIR}/windeployqt${CMAKE_EXECUTABLE_SUFFIX}")
+        if(EXISTS "${_windeployqt}")
+            set(_april_deploy_bins "$<TARGET_FILE:April>")
+            if(UI_BUILD_SHARED)
+                list(APPEND _april_deploy_bins
+                    "$<TARGET_FILE:${UI_SHELL_TARGET}>"
+                    "$<TARGET_FILE:${UI_CUSTOMER_TARGET}>")
+            endif()
+            foreach(_bin IN LISTS _april_deploy_bins)
+                list(APPEND _april_deploy_cmds
+                    COMMAND "${_windeployqt}"
+                        --no-translations --no-system-d3d-compiler --no-opengl-sw
+                        ${_april_qml_args} "${_bin}")
+            endforeach()
+        endif()
+    endif()
+
+    add_custom_target(AprilRuntimeDeploy ALL
+        DEPENDS April ${UI_TRANSLATIONS_TARGET}
+        ${_april_deploy_cmds}
+        COMMENT "Deploy April runtime assets (UiShell profile + translations)")
+endif()
+
 # 测试：根工程用 BUILD_TESTS；独立构建时也接受 SampleFrame 的 Enable_TEST。
 if(BUILD_TESTS OR Enable_TEST)
     enable_testing()

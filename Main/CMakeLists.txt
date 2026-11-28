@@ -39,7 +39,6 @@ set(SHARED_PROJECT_INCLUDE_DIRS
     "${UI_ROOT}/Render"
     "${UI_ROOT}/Services"
     "${UI_ROOT}/Widgets"
-    "${UI_ROOT}/Workbench"
     "${PROJECT_ROOT}/Utility/Utility/Include"
     "${PROJECT_ROOT}/Licensing/License/Include"
     "${PROJECT_ROOT}/Engine/Common/Include"
@@ -135,16 +134,19 @@ set(MAIN_APP_HEADERS
     ${SRC_ROOT}/Common/VersionInfo.h.in
 )
 
-# UI 头随 AprilUi 走，避免在 April 里被 AUTOMOC 再生成一份 moc。
-set(APRIL_UI_HEADERS
-    ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
-)
-if(BUILD_UI3D)
-    list(APPEND APRIL_UI_HEADERS ${SRC_ROOT}/UI/Workbench/Workbench3D.h)
-endif()
+# M6：旧 ClientConfig / Workbench 已移到 UI/Test/LegacyUI，仅供 MainTests 使用；
+# 生产目标不再编译这些源码，也不再收集它们的 qrc。
+set(APRIL_UI_HEADERS "")
 
 file(GLOB_RECURSE MAIN_RESOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/*.qrc"
+)
+list(FILTER MAIN_RESOURCES EXCLUDE REGEX "/Test/")
+
+# April 的生产入口改为 UiShell/main 的 AppBootstrap 流程（M6）。
+# UiShell 子目录稍后加入，这里只收集源文件与 include 路径；链接目标在生成期解析。
+file(GLOB_RECURSE APRIL_SHELL_MAIN_SRC CONFIGURE_DEPENDS
+    "${PROJECT_ROOT}/UiShell/main/*.cpp"
 )
 
 set(APP_NAME "April")
@@ -181,31 +183,6 @@ file(READ "${SRC_ROOT}/Common/BuildConfig.h.in" _build_config_content)
 string(CONFIGURE "${_build_config_content}" _build_config_configured @ONLY)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h" "${_build_config_configured}")
 
-# ---------------------------------------------------------------------------
-# qrc 陈旧护栏
-#
-# configs/ 下新增了客户 JSON 但忘了登记进 configs.qrc 时，构建出的二进制里根本
-# 没有这份配置：运行期只会静默回退到 april，既不报错也看不出少了什么。
-# 反方向（qrc 里登记了已删除的文件）rcc 自己会报错，不需要额外护栏。
-# ---------------------------------------------------------------------------
-file(GLOB _client_config_json CONFIGURE_DEPENDS RELATIVE "${SRC_ROOT}/UI/ClientConfig"
-     "${SRC_ROOT}/UI/ClientConfig/configs/*.json")
-file(READ "${SRC_ROOT}/UI/ClientConfig/configs.qrc" _configs_qrc_content)
-set(_configs_qrc_missing "")
-foreach(_cfg ${_client_config_json})
-    string(FIND "${_configs_qrc_content}" "${_cfg}" _cfg_pos)
-    if(_cfg_pos EQUAL -1)
-        list(APPEND _configs_qrc_missing "${_cfg}")
-    endif()
-endforeach()
-if(_configs_qrc_missing)
-    message(FATAL_ERROR
-        "[Main] configs.qrc is stale: these customer configs exist on disk but are not registered as resources, "
-        "so they are unavailable at runtime after packaging and silently fall back to the default customer:\n  ${_configs_qrc_missing}\n"
-        "Add the corresponding <file alias=...> entries to ${SRC_ROOT}/UI/ClientConfig/configs.qrc.")
-endif()
-
-
 # macOS: 生成 Info.plist。NSHighResolutionCapable 必须为 YES：非 bundle 的裸可执行文件
 # 没有 Info.plist，macOS 会以 1x（低分辨率）合成窗口，而 Qt6 按 Retina(dpr=2) 渲染，
 # 导致 GL 内容错位缩放并残留在视图角落（重复台面/网格、不均匀网格线）。
@@ -216,7 +193,7 @@ if(APPLE)
 endif()
 
 add_executable(${APP_NAME}
-    ${SRC_ROOT}/main.cpp
+    ${APRIL_SHELL_MAIN_SRC}
     ${MAIN_RESOURCES}
 )
 
@@ -511,7 +488,6 @@ target_include_directories(AprilUi
         "${UI_ROOT}"
         "${UI_ROOT}/Services"
         "${UI_ROOT}/Render"
-        "${UI_ROOT}/Workbench"
         "${UI_ROOT}/Widgets"
 )
 target_link_libraries(AprilUi
@@ -528,7 +504,18 @@ target_link_libraries(AprilUi PRIVATE AprilCore)
 target_link_libraries(AprilCore PRIVATE AprilUi)
 
 april_apply_app_target_settings(${APP_NAME})
-target_link_libraries(${APP_NAME} PRIVATE AprilUi AprilCore)
+target_include_directories(${APP_NAME} PRIVATE
+    "${PROJECT_ROOT}/UiShell/main"
+    "${PROJECT_BINARY_DIR}/UiShell/generated"
+)
+target_compile_definitions(${APP_NAME} PRIVATE
+    UI_CUSTOMER_NAME="April"
+    UI_APP_VERSION="${PROJECT_VERSION}"
+    APR_PRODUCT_STARTUP=1
+)
+target_link_libraries(${APP_NAME} PRIVATE
+    AprilUi AprilCore UiShell UiApril UiDialogs
+)
 
 if(APR_PYTHON_HOST)
     add_custom_command(TARGET ${APP_NAME} POST_BUILD
@@ -797,6 +784,16 @@ if(_main_tests AND GTest_FOUND)
         # （否则 gtest 发现阶段会真正启动 GUI 应用并卡死，导致构建超时失败）。
         list(FILTER MAIN_TEST_DEP_SOURCES EXCLUDE REGEX ".*/main\\.cpp$")
 
+        # M6：旧 UI 生产源码整体移到测试专用目录，覆盖由 MainTests 继续承担。
+        # 这些文件不进入 AprilUi / April，只作为测试依赖源码参与编译。
+        file(GLOB_RECURSE LEGACY_UI_TEST_SOURCES CONFIGURE_DEPENDS
+            "${SRC_ROOT}/UI/Test/LegacyUI/*.cpp"
+        )
+        if(NOT BUILD_UI3D)
+            list(FILTER LEGACY_UI_TEST_SOURCES EXCLUDE REGEX ".*Workbench3D\\.cpp$")
+        endif()
+        list(APPEND MAIN_TEST_DEP_SOURCES ${LEGACY_UI_TEST_SOURCES})
+
     # P2 测试扩展: 添加 protobuf 生成的源文件以支持 AprEntitySerializer 测试
     # 生成目录由 FileIO target 通过 INTERFACE_APR_PROTO_GEN_DIR 属性暴露，位于构建树中
     get_target_property(_proto_gen_dir FileIO INTERFACE_APR_PROTO_GEN_DIR)
@@ -817,9 +814,9 @@ if(_main_tests AND GTest_FOUND)
         ${MAIN_TEST_SOURCES}
         ${MAIN_TEST_DEP_SOURCES}
         ${PROTO_GEN_SRC}
-        ${SRC_ROOT}/UI/ClientConfig/ExampleCustomPanel.h
-        ${SRC_ROOT}/UI/ClientConfig/configs.qrc
-        ${SRC_ROOT}/UI/ClientConfig/branding/branding.qrc
+        ${SRC_ROOT}/UI/Test/LegacyUI/UI/ClientConfig/ExampleCustomPanel.h
+        ${SRC_ROOT}/UI/Test/LegacyUI/UI/ClientConfig/configs.qrc
+        ${SRC_ROOT}/UI/Test/LegacyUI/UI/ClientConfig/branding/branding.qrc
     )
 
     target_compile_features(MainTests PRIVATE cxx_std_17)
@@ -827,6 +824,11 @@ if(_main_tests AND GTest_FOUND)
     target_include_directories(MainTests
         PRIVATE
             ${SHARED_PROJECT_INCLUDE_DIRS}
+            "${SRC_ROOT}/UI/Test/LegacyUI"
+            "${SRC_ROOT}/UI/Test/LegacyUI/UI"
+            "${SRC_ROOT}/UI/Test/LegacyUI/UI/ClientConfig"
+            "${SRC_ROOT}/UI/Test/LegacyUI/UI/Workbench"
+            "${SRC_ROOT}/UI/Test/LegacyUI/UI/Services"
             "${SRC_ROOT}/Persistence"
             "${SRC_ROOT}/Persistence/Repositories"
             "${SRC_ROOT}/Import"

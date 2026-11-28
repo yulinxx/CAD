@@ -9,16 +9,13 @@
 
 #include "UiShell/Contract/Command.h"   // RD::ICommandCatalog / ICommandInvoker / ICommandState
 
-// ---- AprilUi（Main/Src/UI，静态库 AprilUi，M1）----
-#include "UI/ClientConfig/IUiCommandDispatcher.h"   // IUiCommandDispatcher（UiWorkbench 实现）
+#include "OperationCommandSink.h"       // M6：不再依赖旧 ClientConfig/IUiCommandDispatcher
 
 namespace Apr
 {
-    // M4：把现有 CAD 命令体系（IUiCommandDispatcher / OperationBus / UiWorkbench）
-    // 适配到 UiShell 的 RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState。
-    //
-    // 不重写命令系统；复用 AprilUi 的 `UiWorkbench::dispatch` / `isCommandRegistered`。
-    // customers/April 持有本对象，经 CustomerModule 提供给 UiShell，并可注入到 AprilWorkbench。
+    // M6：把现有 CAD 命令体系（OperationBus）与 UiShell 外壳命令
+    // 适配到 RD::ICommandCatalog + RD::ICommandInvoker + RD::ICommandState。
+    // 不再经过旧 WorkbenchWindow / UiWorkbench / IUiCommandDispatcher。
     class Commands : public RD::ICommandCatalog,
                      public RD::ICommandInvoker,
                      public RD::ICommandState,
@@ -41,8 +38,8 @@ namespace Apr
         void addCommand(const RD::CommandView& command);              ///< 登记命令元数据
         int addCommandsFromProfile(const QByteArray& profileJson);    ///< 从客户 profile 的 menus 递归登记命令
         int registerFromProfile(const QByteArray& profileJson) override;  ///< RD::ICommandProfileRegistrar
-        void setDispatcher(IUiCommandDispatcher* dispatcher);        ///< 现有工作台/命令分发器
-        IUiCommandDispatcher* dispatcher() const;
+        void setSink(ICommandSink* sink);        ///< 客户侧命令出口
+        ICommandSink* sink() const;
 
         const QList<RD::CommandView>& commands() const;
 
@@ -50,6 +47,6 @@ namespace Apr
         void collectCommands(const QJsonArray& nodes);               ///< 递归收集 type=command 的节点
 
         QList<RD::CommandView> m_commands;
-        IUiCommandDispatcher* m_dispatcher = nullptr;
+        ICommandSink* m_sink = nullptr;
     };
 }  // namespace Apr

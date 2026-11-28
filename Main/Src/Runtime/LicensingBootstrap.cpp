@@ -15,7 +15,7 @@
 #include "License/LicenseDLL.h"
 #include "License/TrialManager.h"
 #include "Log/AprLogger.h"
-#include "UI/ClientConfig/UiFeatureGate.h"
+#include "UI/Services/UiFeatureGate.h"
 
 namespace
 {
