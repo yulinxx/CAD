@@ -18,6 +18,7 @@
 #include "Common/CrashHandlerBootstrap.h"
 #include "Composition/ApplicationCompositionRoot.h"
 #include "Log/AprLogger.h"
+#include "Platform/MacMenuCleanup.h"
 #include "Runtime/LicensingBootstrap.h"
 #include "UI/Settings/SettingsService.h"
 #include "Ut/BundleResources.h"
@@ -216,6 +217,11 @@ void aprilShellAfterBootstrap()
     // 客户配置自检属于旧 ClientConfig 的测试专用路径；UiShell profile 的
     // 诊断由 StartupSession::printDiagnostics() 在加载阶段统一输出。
     installQuitHook();
+
+    // 原生菜单栏由 UiShell 构建后，Qt 只把 QIcon 同步到 NSMenuItem.image；
+    // macOS 27+ 默认隐藏该图片。旧路径在 WorkbenchMenuManager 里修过，M6 后
+    // 那段代码只由测试编译，生产 April 必须在这里补回，否则菜单没有图标。
+    ensureMacMenuImagesVisible();
 }
 
 void aprilShellShutdown()

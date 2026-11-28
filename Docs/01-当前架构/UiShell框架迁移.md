@@ -69,6 +69,8 @@ AprilCore ──x──> UiShell                                 // 算法不依
   `editToolbar→TopToolBar`（顶部编辑工具栏，命令顺序来自 `props.commands`），
   `scene→SceneTreePanel`, `inspector→PropertiesPanelWidget`, `status→StatusBar`, 未识别→空 `QWidget`。
   `ui.json.window.nativeMenuBar=true` 让 macOS 使用屏幕顶部原生菜单栏；`props.kind` 可显式指定面板类型。
+  macOS 27+ 由 `aprilShellAfterBootstrap()` 调 `ensureMacMenuImagesVisible()` 显式打开
+  `NSMenuItem.preferredImageVisibility`，补回原生菜单项图标。
 - `ui.json` `regions` + `panels` + `menus`；`configs/base.json` `menus`(8)→`UiShell MenuNodeSpec` **8 menus / 184 个 id**（`type action→command`, `command→commandId`, `label→titleKey`, `icon→iconKey`, `separator`, `submenu`），已覆盖 `base.json` 全部 id。
 - `Apr::Commands::addCommandsFromProfile()` 从 ui.json 递归登记 `type=command` 节点到目录，`AssemblyPlanner` 才不会把菜单当未知命令剔除；`UiTstAprilMenuCatalog` 校验随附 profile 的每个菜单命令都可被 `find()`。
 - 外置 `--profile` 走契约 `RD::ICommandProfileRegistrar`：`ProfilePipeline::loadFromJson()` 在规划前调用，四套客户 `Commands` 均实现（April 复用上述函数，其余继承 `CommandTable` 默认实现）；新菜单命令无需重编即可入目录，`UiTstProfileCommands` 校验有/无钩子的诊断差异与幂等性。

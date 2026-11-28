@@ -315,7 +315,10 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   `editToolbar`（`top.toolbar`），并开启 `window.nativeMenuBar` 让 macOS 使用屏幕顶部原生
   菜单栏。`Apr::PanelFactory` 从 2D 命令目录与 `props.commands` 取外壳 QAction，装配
   `DrawToolBarWidget` / `TopToolBar`；Select/Pan 切换经 `IShellHost::invoke` 回派。
-  `UiTstCustomerProfile` 覆盖该 profile 配置，`SampleFrame/` 仍未修改。
+  macOS 27+ 的 AppKit 默认隐藏 `NSMenuItem.image`，生产 April 在 `aprilShellAfterBootstrap()`
+  调用 `ensureMacMenuImagesVisible()` 恢复原生菜单图标（旧路径原在测试专用的
+  `WorkbenchMenuManager` 中调用）。`UiTstCustomerProfile` 覆盖该 profile 配置，
+  `SampleFrame/` 仍未修改。
 - **验收**：`BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh` 通过（25/25 层检/单测 +
   `AprilShell smoke OK`）；`cmake --build build` 全目标构建通过；`Tools/package_smoke_test.py`
   的 staged 安装/运行/升级/卸载冒烟通过。默认 `-DUI_CUSTOMER=MantiSoft` 不生成
