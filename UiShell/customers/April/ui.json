@@ -12,7 +12,7 @@
   "window": {
     "minWidth": 900,
     "minHeight": 600,
-    "nativeMenuBar": false
+    "nativeMenuBar": true
   },
   "regions": [
     {
@@ -81,10 +81,47 @@
   ],
   "panels": [
     {
-      "id": "tools",
+      "id": "drawTools",
+      "factory": "april.panel",
+      "area": "left.main",
+      "order": 5,
+      "preferredWidth": 56,
+      "props": {
+        "kind": "drawTools"
+      }
+    },
+    {
+      "id": "editToolbar",
       "factory": "april.panel",
       "area": "top.toolbar",
-      "order": 10
+      "order": 5,
+      "props": {
+        "kind": "topToolbar",
+        "commands": [
+          "edit.undo",
+          "edit.redo",
+          "separator",
+          "edit.mirror_horizontal",
+          "edit.mirror_vertical",
+          "separator",
+          "edit.align_left",
+          "edit.align_right",
+          "edit.align_center_h",
+          "edit.align_top",
+          "edit.align_bottom",
+          "edit.align_center_v",
+          "separator",
+          "edit.select_all",
+          "edit.invert_selection",
+          "edit.deselect",
+          "separator",
+          "edit.copy",
+          "edit.paste",
+          "edit.delete",
+          "separator",
+          "edit.group"
+        ]
+      }
     },
     {
       "id": "scene",
@@ -1160,7 +1197,7 @@
           "type": "command",
           "commandId": "algo.bitmap_process",
           "titleKey": "Process Bitmap...",
-          "iconKey": ":/ui/common/Icons/View3D/bitmap.svg"
+          "iconKey": ":/ui/common/Icons/Tools/bitmap.svg"
         },
         {
           "id": "algo.vectorize_bitmap",

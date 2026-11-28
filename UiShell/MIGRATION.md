@@ -311,6 +311,11 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 - **部署**：根 CMake 的部署调用因目标目录限制改由 `UiShell/CMakeLists.txt` 的
   `AprilRuntimeDeploy ALL` 承接，随 `April` 部署 profile/translations/运行时资源；安装规则
   同步安装 `UiShell`/`UiApril` 动态库与 `profile/`，避免装出来的 `April` 缺库或缺 ui.json。
+- **April 工具栏/菜单栏回归修复**：`ui.json` 显式声明 `drawTools`（`left.main`）与
+  `editToolbar`（`top.toolbar`），并开启 `window.nativeMenuBar` 让 macOS 使用屏幕顶部原生
+  菜单栏。`Apr::PanelFactory` 从 2D 命令目录与 `props.commands` 取外壳 QAction，装配
+  `DrawToolBarWidget` / `TopToolBar`；Select/Pan 切换经 `IShellHost::invoke` 回派。
+  `UiTstCustomerProfile` 覆盖该 profile 配置，`SampleFrame/` 仍未修改。
 - **验收**：`BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh` 通过（25/25 层检/单测 +
   `AprilShell smoke OK`）；`cmake --build build` 全目标构建通过；`Tools/package_smoke_test.py`
   的 staged 安装/运行/升级/卸载冒烟通过。默认 `-DUI_CUSTOMER=MantiSoft` 不生成

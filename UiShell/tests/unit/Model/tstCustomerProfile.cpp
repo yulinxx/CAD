@@ -1,6 +1,7 @@
 #include <QtTest/QtTest>
 
 #include <QFile>
+#include <QJsonArray>
 
 #include "Model/Profile/ProfileParser.h"
 #include "Model/Profile/ProfileLoadResult.h"
@@ -37,6 +38,16 @@ namespace
         }
         return -1;
     }
+
+    const PanelSpec* findPanel(const ProfileModel& model, const QString& panelId)
+    {
+        for (const PanelSpec& panel : model.panels)
+        {
+            if (panel.strId == panelId)
+                return &panel;
+        }
+        return nullptr;
+    }
 } // namespace
 
 class CustomerProfileTest : public QObject
@@ -48,6 +59,7 @@ private slots:
     void tyvokStudioProfileIsValid();
     void goodLaserProfileIsValid();
     void titleBarConfigsDiffer();
+    void aprilProfileRestoresToolbarsAndNativeMenu();
 };
 
 // 三个客户配置都必须能被框架的通用解析器接受；
@@ -160,6 +172,38 @@ void CustomerProfileTest::titleBarConfigsDiffer()
     QCOMPARE(c.profileModel->titleBar.listButtons.at(0).toStdString(), std::string("minimize"));
     QCOMPARE(c.profileModel->titleBar.listButtons.at(1).toStdString(), std::string("maximize"));
     QCOMPARE(c.profileModel->titleBar.listButtons.at(2).toStdString(), std::string("close"));
+}
+
+// April production shell must restore both toolbars and use the macOS native menu bar.
+// These are profile data, so the generic parser test is enough to guard them.
+void CustomerProfileTest::aprilProfileRestoresToolbarsAndNativeMenu()
+{
+    const ProfileLoadResult result = loadCustomer(QStringLiteral("April"));
+    QVERIFY2(result.isOk(), errorText(result).c_str());
+    QVERIFY(result.profileModel.has_value());
+
+    const ProfileModel& model = *result.profileModel;
+    QVERIFY(model.window.nativeMenuBar.has_value());
+    QVERIFY(*model.window.nativeMenuBar);
+
+    const PanelSpec* drawTools = findPanel(model, QStringLiteral("drawTools"));
+    QVERIFY(drawTools != nullptr);
+    QCOMPARE(drawTools->paneAreaId.toStdString(), std::string("left.main"));
+    QCOMPARE(drawTools->props.value(QStringLiteral("kind")).toString().toStdString(), std::string("drawTools"));
+
+    const PanelSpec* editToolbar = findPanel(model, QStringLiteral("editToolbar"));
+    QVERIFY(editToolbar != nullptr);
+    QCOMPARE(editToolbar->paneAreaId.toStdString(), std::string("top.toolbar"));
+    QCOMPARE(editToolbar->props.value(QStringLiteral("kind")).toString().toStdString(), std::string("topToolbar"));
+
+    const QJsonArray commands = editToolbar->props.value(QStringLiteral("commands")).toArray();
+    QVERIFY(commands.contains(QStringLiteral("edit.undo")));
+    QVERIFY(commands.contains(QStringLiteral("edit.redo")));
+
+    // Existing panels remain mounted; the toolbars are additive.
+    QVERIFY(findPanel(model, QStringLiteral("scene")) != nullptr);
+    QVERIFY(findPanel(model, QStringLiteral("inspector")) != nullptr);
+    QVERIFY(findPanel(model, QStringLiteral("status")) != nullptr);
 }
 
 QTEST_GUILESS_MAIN(CustomerProfileTest)

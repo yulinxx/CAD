@@ -18,11 +18,13 @@ namespace Apr
     // 而不是重写一个新的。factoryId = "april.panel"。
     //
     // panelId 约定（与 ui.json regions/areas 对应；旧 Workbench2D 用同名面板）：
-    //   tools     -> DrawToolBarWidget            （旧左侧绘图工具）
-    //   scene     -> SceneTreePanel              （旧场景树；service 注入后 setMode2D/3D）
-    //   inspector -> PropertiesPanelWidget       （旧属性面板）
-    //   status    -> StatusBar                   （旧状态栏，UI2D）
-    //   layers    -> SceneTreePanel / 占位       （旧图层面板占位，service 注入后接入）
+    //   drawTools / tools -> DrawToolBarWidget     （左侧绘图工具栏，绑定 shell QAction）
+    //   editToolbar       -> TopToolBar            （顶部编辑工具栏，命令顺序来自 props.commands）
+    //   scene             -> SceneTreePanel        （旧场景树；service 注入后 setMode2D/3D）
+    //   inspector         -> PropertiesPanelWidget （旧属性面板）
+    //   status            -> StatusBar             （旧状态栏，UI2D）
+    //   layers            -> SceneTreePanel / 占位 （旧图层面板占位，service 注入后接入）
+    // props.kind 是显式的面板类型，优先于 panelId 的历史映射。
     // 未识别 panelId：返回空 QWidget 占位。
     class PanelFactory : public RD::IWidgetFactory
     {
