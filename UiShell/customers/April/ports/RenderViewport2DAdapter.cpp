@@ -22,8 +22,6 @@ namespace Apr
 
     QWidget* RenderViewport2DAdapter::widget() { return m_vp; }
 
-    void RenderViewport2DAdapter::bindServices(IViewportServices& services) { m_services = &services; }
-
     void RenderViewport2DAdapter::setPositionCallback(PositionCallback callback)
     {
         if (m_vp)

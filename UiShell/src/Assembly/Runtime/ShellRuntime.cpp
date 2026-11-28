@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QIcon>
+#include <QMenu>
 #include <QStringList>
 #include <QWidget>
 
@@ -15,9 +16,9 @@
 #include "Assembly/Menus/MenuController.h"
 #include "Assembly/Runtime/ShellView.h"
 #include "Assembly/Dialogs/DialogController.h"
-#include "UiShell/Assembly/ActiveRuntime.h"
 #include "UiShell/Assembly/IRegionContainer.h"
 #include "UiShell/i18n/ITranslationService.h"
+#include "UiShell/i18n/LanguageArgument.h"
 
 // 显式引用生成函数，保证样式表资源被使用
 static void rdInitShellResources()
@@ -59,7 +60,6 @@ namespace AA
     ShellRuntime::ShellRuntime(const ShellServices& services)
         : m_shellServices(services)
     {
-        setActiveRuntime(this);
         rdInitShellResources();
 
         m_dlgCtrl = std::make_unique<DialogController>(&m_shellServices, &m_profilePipeline.profileDir());
@@ -113,8 +113,6 @@ namespace AA
 
     ShellRuntime::~ShellRuntime()
     {
-        if (activeRuntime() == this)
-            setActiveRuntime(nullptr);
         // 先退订开关变化,避免悬空
         if (m_shellServices.featureFlags && m_ftSubscriptionId != 0)
         {
@@ -181,15 +179,7 @@ namespace AA
 
     bool ShellRuntime::hasExplicitLanguageArgument()
     {
-        const QStringList args = QCoreApplication::arguments();
-        for (int i = 0; i < args.size(); ++i)
-        {
-            if (args.at(i).startsWith(QStringLiteral("--lang=")))
-                return true;
-            if (args.at(i) == QStringLiteral("--lang") && i + 1 < args.size())
-                return true;
-        }
-        return false;
+        return AA::hasExplicitLanguageArgument();
     }
 
     void ShellRuntime::applyBrand()
@@ -315,6 +305,28 @@ namespace AA
     void ShellRuntime::refreshCommands()
     {
         m_cmdActions->refresh();
+    }
+
+    QMenu* ShellRuntime::createContextMenu(const QString& contextMenuId, QWidget* parent)
+    {
+        const auto it = m_profilePipeline.info().contextMenus.constFind(contextMenuId);
+        if (it == m_profilePipeline.info().contextMenus.constEnd() || it.value().isEmpty())
+        {
+            m_strLastMsg = QStringLiteral("unknown context menu '%1'").arg(contextMenuId);
+            return nullptr;
+        }
+
+        // 弹出前统一刷新一次：右键项与菜单 / 工具栏 / 面板看到的是同一份命令状态。
+        m_cmdActions->refresh();
+        return m_menuCtrl->buildContextMenu(it.value(), parent);
+    }
+
+    void ShellRuntime::showContextMenu(const QString& contextMenuId, const QPoint& globalPos, QWidget* anchor)
+    {
+        Q_UNUSED(anchor);
+        std::unique_ptr<QMenu> menu(createContextMenu(contextMenuId, nullptr));
+        if (menu)
+            menu->exec(globalPos);
     }
 
     void ShellRuntime::dispatch(const QString& cmdId)

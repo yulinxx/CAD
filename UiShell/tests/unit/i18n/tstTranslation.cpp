@@ -9,6 +9,7 @@
 #include "i18n/TextContext.h"
 #include "UiShell/i18n/IQtTextProvider.h"
 #include "UiShell/i18n/ITranslationService.h"
+#include "UiShell/i18n/LanguageArgument.h"
 
 using namespace AA;
 
@@ -30,6 +31,7 @@ private slots:
     void cleanup();
 
     void normalizesLanguageIds();
+    void languageArgumentAcceptsBothForms();
     void builtinLanguagesCoverRequestedSet();
     void shortCodeAliasLoadsLegacyQmFiles();
     void repeatedInstallKeepsSingleTranslationSet();
@@ -82,6 +84,27 @@ void TranslationServiceTest::normalizesLanguageIds()
     QCOMPARE(m_service->normalizeLanguageId("hi-IN").toStdString(), std::string("hi_IN"));
     QCOMPARE(m_service->normalizeLanguageId("tr").toStdString(), std::string("tr_TR"));
     QCOMPARE(m_service->normalizeLanguageId("vi-VN").toStdString(), std::string("vi_VN"));
+}
+
+// 入口与运行期共用同一份 --lang 解析：空格与等号写法都必须被识别，
+// 否则“显式语言优先”只对其中一种写法成立。
+void TranslationServiceTest::languageArgumentAcceptsBothForms()
+{
+    const QStringList spaced{QStringLiteral("app"), QStringLiteral("--lang"), QStringLiteral("zh_CN")};
+    QCOMPARE(AA::requestedLanguageArgument(spaced).toStdString(), std::string("zh_CN"));
+    QVERIFY(AA::hasExplicitLanguageArgument(spaced));
+
+    const QStringList joined{QStringLiteral("app"), QStringLiteral("--lang=ja_JP")};
+    QCOMPARE(AA::requestedLanguageArgument(joined).toStdString(), std::string("ja_JP"));
+    QVERIFY(AA::hasExplicitLanguageArgument(joined));
+
+    const QStringList none{QStringLiteral("app")};
+    QVERIFY(AA::requestedLanguageArgument(none).isEmpty());
+    QVERIFY(!AA::hasExplicitLanguageArgument(none));
+
+    const QStringList emptyValue{QStringLiteral("app"), QStringLiteral("--lang=")};
+    QVERIFY(AA::requestedLanguageArgument(emptyValue).isEmpty());
+    QVERIFY(!AA::hasExplicitLanguageArgument(emptyValue));
 }
 
 // 内置语言应覆盖需求中的全部语种，且英文排在首位作为默认回退。

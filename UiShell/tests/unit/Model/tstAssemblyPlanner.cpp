@@ -104,6 +104,17 @@ namespace
       "children": [ "file.new", "file.unknown" ] }
   ]
 })json";
+
+    // 右键菜单与菜单栏复用同一命令语法和过滤规则。
+    const char* const kContextMenuProfile = R"json({
+  "version": 2,
+  "profileId": "context.menus",
+  "regions": [ { "id": "center", "type": "CenterView" } ],
+  "contextMenus": [
+    { "id": "sceneTree", "type": "submenu", "titleKey": "Scene", "order": 10,
+      "children": [ "edit.delete", "edit.unknown" ] }
+  ]
+})json";
 } // namespace
 
 class AssemblyPlannerTest : public QObject
@@ -115,6 +126,7 @@ private slots:
     void flagGatesPanel();
     void samePanelMovesWithArea();
     void menusAreSortedAndUnknownCommandsFiltered();
+    void contextMenusUseSameCommandFiltering();
     void menusKeepAllCommandsWithoutCatalog();
     void titleBarPlanPlatformDefault();
     void titleBarPlanFiltersButtonsAndClamps();
@@ -246,6 +258,31 @@ void AssemblyPlannerTest::menusAreSortedAndUnknownCommandsFiltered()
     QVERIFY(warned);
 }
 
+// 右键菜单走与菜单栏相同的命令过滤：未登记的命令同样丢弃并给出 warning。
+void AssemblyPlannerTest::contextMenusUseSameCommandFiltering()
+{
+    const auto model = parse(QByteArray(kContextMenuProfile));
+    QVERIFY(model.has_value());
+
+    const FakeCatalog catalog(QStringList{ QStringLiteral("edit.delete") });
+    const AssemblyInfo info = planAssembly(*model, FeatureFlagSet(), &catalog);
+
+    QCOMPARE(info.contextMenus.size(), 1);
+    QVERIFY(info.contextMenus.contains(QStringLiteral("sceneTree")));
+
+    const QList<MenuNodeInfo>& items = info.contextMenus.value(QStringLiteral("sceneTree"));
+    QCOMPARE(items.size(), 1);
+    QCOMPARE(items.at(0).strCmdId.toStdString(), std::string("edit.delete"));
+
+    bool warned = false;
+    for (const QString& warning : info.strListWarnings)
+    {
+        if (warning.contains(QStringLiteral("edit.unknown")))
+            warned = true;
+    }
+    QVERIFY(warned);
+}
+
 // 没有 catalog 时不做可用性过滤，纯配置场景也要保留全部命令。
 void AssemblyPlannerTest::menusKeepAllCommandsWithoutCatalog()
 {
@@ -305,7 +342,7 @@ void AssemblyPlannerTest::titleBarPlanFiltersButtonsAndClamps()
       "version": 2,
       "profileId": "tb",
       "titleBar": {
-        "title": "工作台",
+        "title": "\u5de5\u4f5c\u53f0",
         "buttons": [ "close", "bogus", "close", "maximize" ],
         "height": 999
       },
@@ -320,7 +357,7 @@ void AssemblyPlannerTest::titleBarPlanFiltersButtonsAndClamps()
 #if defined(Q_OS_WIN)
     // bogus 被丢弃并产生 warning，重复的 close 只保留首次出现的位置。
     QVERIFY(info.titleBar.bPresent);
-    QCOMPARE(info.titleBar.strTitle.toStdString(), std::string("工作台"));
+    QCOMPARE(info.titleBar.strTitle.toStdString(), std::string("\u5de5\u4f5c\u53f0"));
     QCOMPARE(info.titleBar.nHeight, 96);
     QCOMPARE(info.titleBar.buttons.size(), 2);
     QCOMPARE(info.titleBar.buttons.at(0).toStdString(), std::string("close"));

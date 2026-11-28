@@ -26,7 +26,7 @@ namespace Apr
         std::unique_ptr<CompositionRootAdapter> adapter;
 
         bool built = false;                                     // root->isBuilt()
-        bool wired = false;                                     // bindViewportServices + setSink 已调用
+        bool wired = false;                                     // viewport factory + command sink 已接线
     };
 
     // 对已 build() 的 root 接线：视口服务 + 客户侧 OperationCommandSink。
@@ -42,7 +42,7 @@ namespace Apr
     // 传 nullptr 可清空。不要求 ApplicationCompositionRoot::instance()->isBuilt()。
     void attachCommandSink(Commands& commands, ICommandSink* sink);
 
-    // #2 全链路：April/AprilShell -> ApplicationCompositionRoot::build() -> bindViewportServices + setSink。
+    // #2 全链路：April/AprilShell -> ApplicationCompositionRoot::build() -> viewport factory + sink 接线。
     //   existing 非空用它；否则优先 ApplicationCompositionRoot::instance()；都没有则自建一个。
     //   若 root 尚未 build()，尝试 root->build()（需 UiShell 已发布宿主主窗口；持久化服务允许为空）。
     //   build()/接线失败不抛，返回 built/wired=false，调用方自行决定。

@@ -1,48 +1,33 @@
 #pragma once
 
 #include "IViewportServices.h"
-#include "ICadServiceFactory.h"
 #include "DefaultViewportFactory.h"
+#include "IPropertyPanelServices.h"
 
 class ApplicationCompositionRoot;   // AprilCore；只在 .cpp include
 
 namespace Apr
 {
-    class OperationCommandSink;
-
-    // 低耦合 adapter：把 AprilCore::ApplicationCompositionRoot 适配到 Apr::IViewportServices。
-    // UI 只见 IViewportServices（has*），不见 SceneDocument2D/OperationBus/UiServices/UiWorkbench。
-    class CompositionRootAdapter : public IViewportServices, public ICadServiceFactory
+    // 低耦合 adapter：把 AprilCore::ApplicationCompositionRoot 适配到客户层窄端口。
+    // 组合根只见布尔就绪查询；属性面板只见 PropertyModel / IPropertyEditTarget。
+    class CompositionRootAdapter : public IViewportServices, public IPropertyPanelServices
     {
     public:
         explicit CompositionRootAdapter(ApplicationCompositionRoot& root);
 
-        /// 注入客户侧命令出口，供 dispatchOperation() 复用（M6）。
-        void setCommandSink(OperationCommandSink* sink) { m_commandSink = sink; }
-
         bool hasSceneDocument2D() const override;
-        bool hasSceneDocument3D() const override;
         bool hasOperationBus() const override;
-        bool hasSelectionService() const override;
-        bool hasLayerManager() const override;
-        bool hasUiStateCenter() const override;
-        bool hasCameraController3D() const override;
         bool hasUiServices() const override;
 
-        // 抽象访问 + 转发（不暴露 raw 给 UiShell；算法在 AprilCore）
-        bool canUndo() const override;
-        bool canRedo() const override;
-        void undo() override;
-        void redo() override;
-        bool dispatchOperation(const QString& commandId) override;
+        // IPropertyPanelServices：属性面板只依赖模型 + 编辑目标窄接口
+        PropertyModel buildPropertyModel(const QStringList& ids) const override;
+        std::shared_ptr<IPropertyEditTarget> createEditTarget(const QStringList& ids) override;
 
-        // ICadServiceFactory
-        IViewportFactory* viewportFactory() override;
-        IViewportServices* viewportServices() override;
+        IViewportFactory* viewportFactory() { return &m_viewportFactory; }
+        IPropertyPanelServices* propertyPanelServices() { return this; }
 
     private:
         ApplicationCompositionRoot* m_root = nullptr;
-        OperationCommandSink* m_commandSink = nullptr;
         DefaultViewportFactory m_viewportFactory;
     };
 }  // namespace Apr

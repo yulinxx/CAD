@@ -2,8 +2,29 @@
 
 // ---- AprilCore ----
 #include "Composition/ApplicationCompositionRoot.h"
-#include "commands/OperationCommandSink.h"
-#include <QVariantMap>
+
+#include <vector>
+
+// ---- 属性面板算法产物：只在 adapter 内部引用，面板不见引擎/撤销细节 ----
+#include "UI/Dlg/IPropertyEditTarget.h"
+#include "UI2D/Service/EntityPropertyEditSession2D.h"
+
+namespace
+{
+    std::vector<Eg::EntityId> toEntityIds(const QStringList& ids)
+    {
+        std::vector<Eg::EntityId> result;
+        result.reserve(ids.size());
+        for (const QString& id : ids)
+        {
+            bool ok = false;
+            const qlonglong value = id.toLongLong(&ok);
+            if (ok)
+                result.push_back(static_cast<Eg::EntityId>(value));
+        }
+        return result;
+    }
+}  // namespace
 
 namespace Apr
 {
@@ -16,64 +37,29 @@ namespace Apr
     {
         return m_root && m_root->isBuilt() && m_root->document2D() != nullptr;
     }
-    bool CompositionRootAdapter::hasSceneDocument3D() const
-    {
-        return m_root && m_root->isBuilt() && m_root->sceneManager3D() != nullptr;
-    }
+
     bool CompositionRootAdapter::hasOperationBus() const
     {
         return m_root && m_root->isBuilt() && m_root->operationBus() != nullptr;
     }
-    bool CompositionRootAdapter::hasSelectionService() const
-    {
-        return m_root && m_root->isBuilt() && m_root->selectionService() != nullptr;
-    }
-    bool CompositionRootAdapter::hasLayerManager() const
-    {
-        return m_root && m_root->isBuilt() && m_root->layerManager() != nullptr;
-    }
-    bool CompositionRootAdapter::hasUiStateCenter() const
-    {
-        return m_root && m_root->isBuilt() && m_root->stateCenter() != nullptr;
-    }
-    bool CompositionRootAdapter::hasCameraController3D() const
-    {
-        return m_root && m_root->isBuilt();
-    }
+
     bool CompositionRootAdapter::hasUiServices() const
     {
         return m_root && m_root->isBuilt();
     }
+
+    PropertyModel CompositionRootAdapter::buildPropertyModel(const QStringList& ids) const
+    {
+        // 会话每次按 id 重新解析图元；buildModel 不修改场景，也不需要编辑权限。
+        SceneEditService* sceneEdit = (m_root && m_root->isBuilt()) ? m_root->sceneEditService() : nullptr;
+        const EntityPropertyEditSession2D session(sceneEdit, toEntityIds(ids));
+        return session.buildModel();
+    }
+
+    std::shared_ptr<IPropertyEditTarget> CompositionRootAdapter::createEditTarget(const QStringList& ids)
+    {
+        if (!m_root || !m_root->isBuilt())
+            return {};
+        return std::make_shared<EntityPropertyEditSession2D>(m_root->sceneEditService(), toEntityIds(ids));
+    }
 }  // namespace Apr
-
-namespace Apr
-{
-    bool CompositionRootAdapter::canUndo() const
-    {
-        return m_root && m_root->isBuilt() && m_root->undoRedoManager() && m_root->undoRedoManager()->canUndo();
-    }
-    bool CompositionRootAdapter::canRedo() const
-    {
-        return m_root && m_root->isBuilt() && m_root->undoRedoManager() && m_root->undoRedoManager()->canRedo();
-    }
-    void CompositionRootAdapter::undo()
-    {
-        if (m_root && m_root->isBuilt() && m_root->undoRedoManager())
-            m_root->undoRedoManager()->undo();
-    }
-    void CompositionRootAdapter::redo()
-    {
-        if (m_root && m_root->isBuilt() && m_root->undoRedoManager())
-            m_root->undoRedoManager()->redo();
-    }
-    bool CompositionRootAdapter::dispatchOperation(const QString& commandId)
-    {
-        if (!m_root || !m_root->isBuilt() || !m_commandSink || !m_commandSink->isRegistered(commandId))
-            return false;
-        m_commandSink->dispatch(commandId, QVariantMap{});
-        return true;
-    }
-
-    IViewportFactory* CompositionRootAdapter::viewportFactory() { return &m_viewportFactory; }
-    IViewportServices* CompositionRootAdapter::viewportServices() { return this; }
-}

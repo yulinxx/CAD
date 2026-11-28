@@ -30,6 +30,9 @@ namespace
             add(QStringLiteral("view.grid"), [this](const QJsonObject&) { grid = !grid; })
                 .title(QStringLiteral("custom.grid"))
                 .checkedWhen([this]() { return grid; });
+
+            add(QStringLiteral("file.print"), [this](const QJsonObject&) { calls.append(QStringLiteral("file.print")); })
+                .visibleWhen([this]() { return hasDocument; });
         }
 
         QStringList calls;
@@ -50,6 +53,7 @@ private slots:
     void invokeRunsHandlerWithArgs();
     void unknownOrHandlerlessCommandIsIgnored();
     void queryStateOnlyChangesProvidedFields();
+    void visibleStateFollowsProvider();
     void addingSameIdReplaces();
 };
 
@@ -131,6 +135,20 @@ void CommandTableTest::queryStateOnlyChangesProvidedFields()
 
     commands.queryState(QStringLiteral("missing"), untouched);  // 未知命令：不改
     QVERIFY(untouched.bChecked);
+}
+
+// 可见性是命令状态的一部分：菜单 / 工具栏 / 右键 / 面板共用动作时不能再各存一份。
+void CommandTableTest::visibleStateFollowsProvider()
+{
+    SampleCommands commands;
+    CommandStatus status;
+    commands.queryState(QStringLiteral("file.print"), status);
+    QVERIFY(!status.bVisible);
+
+    commands.invoke(QStringLiteral("file.new"));
+    status = CommandStatus();
+    commands.queryState(QStringLiteral("file.print"), status);
+    QVERIFY(status.bVisible);
 }
 
 void CommandTableTest::addingSameIdReplaces()

@@ -112,7 +112,6 @@
 #include "UiWorkbench.h"
 #include "UiSceneTreePanel.h"
 #include "UiPropertiesPanel.h"
-#include "UiLayoutService.h"
 #include "Persistence/PersistenceService.h"
 #include "Persistence/Repositories/WorkspaceSnapshotRepository.h"
 #include "Persistence/Models/WorkspaceSnapshotRecord.h"

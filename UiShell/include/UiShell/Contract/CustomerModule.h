@@ -15,6 +15,7 @@ namespace AA
     class ICommandInvoker;
     class ICommandState;
     class ICommandProfileRegistrar;
+    class IRuntimeBinding;
 
     struct WidgetFactoryBinding
     {
@@ -70,6 +71,9 @@ namespace AA
 
         // 命令状态
         const ICommandState* cmdState = nullptr;
+
+        // 可选：宿主创建外壳运行时后回绑；客户不必再查进程级全局。
+        IRuntimeBinding* runtimeBinding = nullptr;
 
         QList<WidgetFactoryBinding> listWidgetFactoriesBind;
         QList<DlgFactoryBinding> listDlgFactoriesBind;

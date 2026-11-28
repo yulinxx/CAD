@@ -3,7 +3,6 @@
 #include <memory>
 #include <vector>
 
-#include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiServices.h"
 #include "UI/Services/UiStateCenter.h"
 #include "UI/Documents/SceneDocument2D.h"
@@ -125,9 +124,6 @@ public:
 
     /// 获取状态中心
     UiStateCenter* stateCenter();
-
-    /// 获取布局服务
-    UiLayoutService* layoutService();
 
     /// 获取操作总线
     OperationBus* operationBus();
@@ -335,9 +331,6 @@ private:
     /// 【声明位置约束】必须在 m_persistenceService 之后（先于它析构）、
     /// m_settingsService 之前（晚于它析构，仓库持有的裸指针才不悬空）。
     std::unique_ptr<SharedDatabaseAdapter> m_settingsDbAdapter;
-
-    /// 布局服务
-    std::unique_ptr<UiLayoutService> m_layoutService;
 
     /// 操作总线（新命令主线）
     std::unique_ptr<OperationBus> m_operationBus;

@@ -36,8 +36,8 @@ namespace Apr
     // ---------------- AA::ICommandState ----------------
     void Commands::queryState(const QString& commandId, AA::CommandStatus& status) const
     {
+        // 只覆盖自己知道的 enabled；勾选态由 shell 动作池保留，避免把 checkable 命令重置掉。
         status.bEnabled = m_sink ? m_sink->isRegistered(commandId) : false;
-        status.bChecked = false;
     }
 
     // ---------------- 装配 ----------------
@@ -54,12 +54,18 @@ namespace Apr
         const QJsonDocument doc = QJsonDocument::fromJson(profileJson);
         if (!doc.isObject())
             return 0;
-        const QJsonValue menus = doc.object().value(QStringLiteral("menus"));
-        if (!menus.isArray())
+        const QJsonObject root = doc.object();
+        const QJsonValue menus = root.value(QStringLiteral("menus"));
+        const QJsonValue contextMenus = root.value(QStringLiteral("contextMenus"));
+        if (!menus.isArray() && !contextMenus.isArray())
             return 0;
 
         const int before = m_commands.size();
-        collectCommands(menus.toArray());
+        if (menus.isArray())
+            collectCommands(menus.toArray());
+        // 右键专属命令也要进目录，否则 AssemblyPlanner 会把它们当未知命令过滤掉。
+        if (contextMenus.isArray())
+            collectCommands(contextMenus.toArray());
         return m_commands.size() - before;
     }
 

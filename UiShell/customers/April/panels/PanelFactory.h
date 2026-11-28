@@ -1,8 +1,12 @@
 #pragma once
 
+#include <QPointer>
+
 #include "AprilWorkbench.h"
 
 #include "UiShell/Contract/WidgetFactory.h"   // AA::IWidgetFactory / AA::PanelCreateRequest
+#include "UI/Widgets/UiPropertiesPanel.h"     // PropertiesPanelWidget（面板只消费数据模型）
+#include "ports/IPropertyPanelServices.h"     // Apr::IPropertyPanelServices（窄接口）
 
 namespace Apr
 {
@@ -34,7 +38,15 @@ namespace Apr
         // 状态栏需要视口坐标反馈；由客户模块注入 workbench，工厂只负责建控件并注册 sink。
         void setWorkbench(AprilWorkbench* workbench) { m_workbench = workbench; }
 
+        // 属性面板由算法适配层供给 PropertyModel / IPropertyEditTarget；面板不再自建数据。
+        void setPropertyServices(IPropertyPanelServices* services) { m_propertyServices = services; }
+
     private:
+        void refreshPropertiesPanel();
+
         AprilWorkbench* m_workbench = nullptr;
+        IPropertyPanelServices* m_propertyServices = nullptr;
+        QPointer<PropertiesPanelWidget> m_propertiesPanel;
+        QStringList m_lastSelectionIds;
     };
 }  // namespace Apr

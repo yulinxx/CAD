@@ -26,7 +26,7 @@ set(_pub_root "include/UiShell")
 set(_layer_contract   "Contract")
 set(_layer_model      "Model")
 set(_layer_assembly   "Assembly")
-set(_layer_titlebar   "TitleBar")
+set(_layer_titlebar   "Titlebar")
 set(_layer_platform   "Platform")
 set(_layer_i18n       "i18n")
 
@@ -147,7 +147,7 @@ _scan_scope("${_ref}(${_layer_assembly}|${_layer_titlebar}|${_layer_platform})/|
 _scan_scope("${_ref}${_layer_model}/"
     "${_pub_root}/Contract/*.h"
     "${_pub_root}/Platform/*.h"
-    "${_pub_root}/TitleBar/*.h"
+    "${_pub_root}/${_layer_titlebar}/*.h"
     "${_pub_root}/i18n/*.h"
     "${_pub_root}/About/*.h"
     "${_pub_root}/Export.h")
@@ -238,9 +238,9 @@ _scan_lines("parentWidget\\s*\\(\\s*\\)\\s*->"
 # 公开头不得出现标准库类型：std::string、vector、function、unique_ptr 等的布局随编译器、
 # CRT 与 _ITERATOR_DEBUG_LEVEL 变化，跨 DLL 传递即内存问题（规则见 include/UiShell/Export.h）。
 # 例外：Retranslatable.h / CommandTable.h（仅在客户模块内实例化），
-# IMenuPresenter.h / FeatureFlag.h / WindowSpec.h / WindowFrame.h / Export.h（仅传递函数对象、智能指针、optional）。
+# FeatureFlag.h / WindowSpec.h / WindowFrame.h / Export.h（仅传递函数对象、智能指针、optional）。
 file(GLOB_RECURSE _UI_pub_headers "${UI_SOURCE_DIR}/${_pub_root}/*.h")
-list(FILTER _UI_pub_headers EXCLUDE REGEX "/(Retranslatable|CommandTable|IMenuPresenter|FeatureFlag|WindowSpec|WindowFrame|Export)\\.h$")
+list(FILTER _UI_pub_headers EXCLUDE REGEX "/(Retranslatable|CommandTable|FeatureFlag|WindowSpec|WindowFrame|Export)\\.h$")
 if(NOT _UI_pub_headers)
     message(FATAL_ERROR "Std-type check scope matched no files: ${_pub_root}")
 endif()

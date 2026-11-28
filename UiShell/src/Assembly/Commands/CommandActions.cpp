@@ -183,6 +183,7 @@ namespace AA
             m_shellServices->cmdState->queryState(commandId, status);
 
         action->setEnabled(featuresOk && status.bEnabled);
+        action->setVisible(status.bVisible);
         if (action->isCheckable())
         {
             action->setChecked(status.bChecked);

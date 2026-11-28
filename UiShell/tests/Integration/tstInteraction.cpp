@@ -23,6 +23,8 @@
 #include <QToolButton>
 #include <QWidget>
 
+#include <memory>
+
 #include "TestHelpers.h"
 #include "UiShell/Assembly/IRegionContainer.h"
 #include "UiShell/Assembly/IShellRuntime.h"
@@ -147,6 +149,23 @@ namespace
         return QJsonArray{ QStringLiteral("file.new"), QStringLiteral("|"), QStringLiteral("file.save"),
             QStringLiteral("view.grid"), QStringLiteral("unknown.command") };
     }
+
+    // 右键菜单只声明命令 id；QMenu 由外壳按共享动作池构建，控件不再自建 QAction。
+    const char* const kContextMenuProfile = R"json({
+  "version": 2,
+  "profileId": "interaction.context",
+  "regions": [
+    { "id": "center", "type": "CenterView", "order": 30 }
+  ],
+  "menus": [
+    { "type": "submenu", "id": "file", "titleKey": "File", "order": 10,
+      "children": [ "file.new", "file.save", "view.grid" ] }
+  ],
+  "contextMenus": [
+    { "id": "sceneTree", "type": "submenu", "titleKey": "Scene", "order": 10,
+      "children": [ "file.new", "file.save", "view.grid" ] }
+  ]
+})json";
 
     QAction* menuAction(QWidget* shell, const QString& commandId)
     {
@@ -466,6 +485,7 @@ private slots:
     void customerRegistersAboutDialog();
     void menuAndToolbarShareOneAction();
     void commandStateSyncsAllEntries();
+    void contextMenuUsesSharedCommandActions();
     void sharedActionsSurviveShellRefresh();
     void panelInvokeWithArgsSkipsDialog();
     void toolbarPropsAreValidated();
@@ -1139,19 +1159,16 @@ void InteractionTest::profileLanguageCommandHasSingleBinding()
 
     showShell(*runtime);
 
+    // 内置语言菜单与 profile 命令节点复用同一个共享动作；不再另建一个
+    // 同名 QAction，否则两处勾选态与启用态会各自漂移。
     const QList<QAction*> actions = runtime->shell()->findChildren<QAction*>(
         QStringLiteral("msui.action.language.zh_CN"));
-    QCOMPARE(actions.size(), 2);
+    QCOMPARE(actions.size(), 1);
 
-    QAction* profileAction = nullptr;
-    for (QAction* action : actions)
-    {
-        if (action->property("msui.profileCommand").toBool())
-            profileAction = action;
-    }
-    QVERIFY(profileAction != nullptr);
+    QAction* sharedAction = actions.first();
+    QVERIFY(sharedAction->property("msui.profileCommand").toBool());
 
-    profileAction->trigger();
+    sharedAction->trigger();
     QCOMPARE(invoker.invoked, QStringList{ QStringLiteral("language.zh_CN") });
     QCOMPARE(listener.count, 0);
 }
@@ -1627,6 +1644,9 @@ void InteractionTest::customerModuleIsUsable()
     QVERIFY(module.cmdInvoker != nullptr);
     QVERIFY(module.cmdState != nullptr);
     QVERIFY(module.cmdProfileRegistrar != nullptr);  // 外置 --profile 的菜单命令可补登记
+    // April 的命令出口由宿主显式回绑运行时，不依赖已删除的进程级全局运行时。
+    if (module.strId == QLatin1String("april"))
+        QVERIFY(module.runtimeBinding != nullptr);
 
     // strProfilePath 指向客户库内嵌的 profile 资源：换机器 / 漏拷外置文件时仍能兜底启动。
     QVERIFY2(module.strProfilePath.startsWith(QLatin1Char(':')), qPrintable(module.strProfilePath));
@@ -1771,6 +1791,42 @@ void InteractionTest::commandStateSyncsAllEntries()
     runtime->refreshCommands();
     QVERIFY(!save->isEnabled());
     QVERIFY(!grid->isChecked());
+}
+
+// 右键菜单与菜单栏 / 工具栏共用同一组 QAction：状态与执行路径只有一条。
+void InteractionTest::contextMenuUsesSharedCommandActions()
+{
+    DocumentCommands commands;
+    ShellServices shellServices;
+    shellServices.cmdCatalog = &commands;
+    shellServices.cmdInvoker = &commands;
+    shellServices.cmdState = &commands;
+
+    ApiPtr<IShellRuntime> runtime(createShellRuntime(shellServices));
+    QVERIFY(runtime);
+    QVERIFY2(runtime->loadFromJson(QByteArray(kContextMenuProfile)), qPrintable(runtime->lastError()));
+
+    QAction* save = runtime->commandAction(QStringLiteral("file.save"));
+    QAction* grid = runtime->commandAction(QStringLiteral("view.grid"));
+    QVERIFY(save != nullptr);
+    QVERIFY(grid != nullptr);
+
+    std::unique_ptr<QMenu> menu(runtime->createContextMenu(QStringLiteral("sceneTree"), nullptr));
+    QVERIFY(menu != nullptr);
+    const QList<QAction*> actions = menu->actions();
+    QCOMPARE(actions.size(), 3);
+    QVERIFY(actions.contains(save));
+    QVERIFY(actions.contains(grid));
+
+    // 右键入口触发的仍是命令总线；命令执行后三处入口同步刷新。
+    QVERIFY(!save->isEnabled());
+    QVERIFY(actions.at(0) == runtime->commandAction(QStringLiteral("file.new")));
+    actions.at(0)->trigger();
+    QVERIFY(save->isEnabled());
+    QVERIFY(commands.calls.contains(QStringLiteral("file.new")));
+
+    // 未声明的上下文 id 不给空菜单，也不伪造动作。
+    QVERIFY(runtime->createContextMenu(QStringLiteral("missing"), nullptr) == nullptr);
 }
 
 // 切皮肤 / 切语言只重建菜单，不重建面板：新菜单仍然引用工具栏正在用的那一个动作。

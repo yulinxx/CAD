@@ -1,13 +1,10 @@
 #include "UiShell/Assembly/HostWindow.h"
 
-#include "UiShell/Assembly/ActiveRuntime.h"
-
 namespace AA
 {
     namespace
     {
         QMainWindow* g_hostMainWindow = nullptr;
-        IShellRuntime* g_activeRuntime = nullptr;
     }  // namespace
 
     void setHostMainWindow(QMainWindow* window)
@@ -18,15 +15,5 @@ namespace AA
     QMainWindow* hostMainWindow()
     {
         return g_hostMainWindow;
-    }
-
-    void setActiveRuntime(IShellRuntime* runtime)
-    {
-        g_activeRuntime = runtime;
-    }
-
-    IShellRuntime* activeRuntime()
-    {
-        return g_activeRuntime;
     }
 }  // namespace AA

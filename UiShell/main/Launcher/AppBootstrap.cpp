@@ -16,6 +16,7 @@
 #include "UiShell/Contract/CustomerModule.h"
 #include "UiShell/Contract/DialogRegistry.h"
 #include "UiShell/Contract/FeatureFlag.h"
+#include "UiShell/Contract/IRuntimeBinding.h"
 #include "UiShell/Contract/WidgetFactory.h"
 
 namespace
@@ -33,7 +34,16 @@ namespace
 
 AppBootstrap::AppBootstrap() = default;
 
-AppBootstrap::~AppBootstrap() = default;
+AppBootstrap::~AppBootstrap()
+{
+    // 运行时先于客户模块销毁：先清掉客户侧缓存，避免遗留悬空指针。
+    if (m_moduleProvider)
+    {
+        AA::IRuntimeBinding* binding = m_moduleProvider->module().runtimeBinding;
+        if (binding)
+            binding->bindRuntime(nullptr);
+    }
+}
 
 int AppBootstrap::start(QMainWindow* window)
 {
@@ -126,6 +136,10 @@ int AppBootstrap::start(QMainWindow* window)
         std::fprintf(stderr, "App: createShellRuntime returned null\n");
         return kExitShellRuntime;
     }
+
+    // 客户模块创建早于运行时：这里显式回绑，客户命令出口不再查全局。
+    if (module.runtimeBinding)
+        module.runtimeBinding->bindRuntime(m_shellRT.get());
 
     window->setWindowTitle(m_moduleProvider->title());
     window->resize(kDefaultWidth, kDefaultHeight);

@@ -55,14 +55,15 @@ AprilCore ──x──> UiShell                                 // 算法不依
   - `Apr::Viewport3DAdapter`：`Viewport3D + RenderWidget3DAdapter` 藏后（`BUILD_UI3D`）。
   - `Apr::AprilWorkbench::createCenterView2D/3D` 走 `IViewportFactory` + `widget()`；**不** `new RenderViewport2D/Viewport3D`；旧视口藏在 adapter 中，不再持有 raw 指针。
 - `Apr::IViewportServices` + `Apr::CompositionRootAdapter`
-  - `hasSceneDocument2D/hasSceneDocument3D/hasOperationBus/hasSelectionService/hasLayerManager/hasUiStateCenter/hasCameraController3D/hasUiServices`；
-  - 从 `AprilCore::ApplicationCompositionRoot` 适配；`Apr::AprilWorkbench::bindViewportServices(IViewportServices&)`；`UiShell` 不见 `ApplicationCompositionRoot`/`SceneDocument2D`/`OperationBus`。
+  - 只保留 `hasSceneDocument2D/hasOperationBus/hasUiServices` 三个接线就绪查询；
+  - 从 `AprilCore::ApplicationCompositionRoot` 适配，`wireCompositionRoot()` 直接询问 adapter；
+  `UiShell` 不见 `ApplicationCompositionRoot`/`SceneDocument2D`/`OperationBus`。
 - **命令**：`Apr::Commands : AA::ICommandCatalog + AA::ICommandInvoker + AA::ICommandState`
   - `setSink(Apr::ICommandSink*)`；生产实现为 `OperationCommandSink`（主题/语言/关于框/工作台切换走 `IShellRuntime`，2D 命令走 `CommandCatalog`/`OperationRouting`/`OperationBus`）；
   - `invoke/invokeWithArgs -> ICommandSink::dispatch -> OperationBus`；`UiShell` 只见 `AA::ICommand*`。
   - `Apr::attachCommandSink(Commands&, ICommandSink*)`；`Apr::attachCompositionRoot(...)` 可选 `ApplicationCompositionRoot::instance()`。
-  - `AppBootstrap` 通过 `IHostWindow` 在创建客户模块前发布宿主 `QMainWindow`；`ShellRuntime` 通过 `IActiveRuntime` 发布活动运行时。
-- `AprilWorkbench`（`customers/April`，`AA::ICenterViewProvider`）仍持有服务用于适配，但**`UiShell` core 不见**。
+  - `AppBootstrap` 通过 `IHostWindow` 在创建客户模块前发布宿主 `QMainWindow`；运行时改由 `IRuntimeBinding` 显式回绑。
+- `AprilWorkbench`（`customers/April`，`AA::ICenterViewProvider`）只持有 factory / port，不持有 UI 服务；**`UiShell` core 不见**。
 
 ## 4. M3/M4 视口与旧 UI 界面
 
@@ -85,8 +86,8 @@ AprilCore ──x──> UiShell                                 // 算法不依
 
 - **`AprilShell` 完整 profile + offscreen** 仍会崩在 `MetalSurface`：offscreen 无原生窗口，属环境限制；最小 profile 冒烟已通过。原“profile 加载后立即崩溃”的真因（栈上 adapter 悬空）已修，见 `MIGRATION.md` §0.5。
 - **M3 运行时** 2D 绘图/选择/变换/撤销未验证；需在真实窗口环境验收；`UiWorkbench` 可能未 `setWorkbench`。
-- `Apr::IViewportServices` 现在经 `ICadViewport::bindServices` 真注入（不再空实现），服务转发到 `DefaultViewportFactory`；2D 交互语义仍待验证。
-- `AprilWorkbench` 只保存 `IViewportServices`/`IViewportFactory`/`ICadViewport` 等 port；组合根与 adapter 由 `ModuleParts.wiring` 持有；不返回 raw 旧视口。
+- `Apr::IViewportServices` 已收敛为三个就绪查询；`ICadViewport::bindServices` 链因无读者删除，2D 交互语义仍待验证。
+- `AprilWorkbench` 只保存 `IViewportFactory` / `ICadViewport` 两个 port；组合根与 adapter 由 `ModuleParts.wiring` 持有；不返回 raw 旧视口。
 - **M4** 菜单转换、目录登记与外置 profile 同步已完成（unknown-command 警告为 0），但点击/快捷键同一命令路径的运行时未验证；生产命令出口已改为 `OperationCommandSink`，不再依赖 `UiWorkbench`。
 - **M5** 数据化已做：`ui.json` 可选 `brand`（产品名/组织/图标/默认皮肤/默认语言/关于框字段）、
   外置 `styles/` 与 `translations/` 叠加、相对资源按 profile 目录解析、`UiDeployProfile` 一并部署；
@@ -102,6 +103,27 @@ AprilCore ──x──> UiShell                                 // 算法不依
   `ctest -R "UiTst|UiLayerCheck"` 保持 25/25。
 - `AprilUi`↔`AprilCore` 的边界仍由客户层 port/adapter 管理；旧 `Main::AppBootstrapper` 已删；`April` 仍可运行。
 - `Engine` 子模块 WIP + GeometryContext 补丁未提交。
+
+## 5.1 命令状态与右键统一（进行中）
+
+> 细节仍以 `UiShell/MIGRATION.md` 为准；本节只摘要。
+
+- `CommandStatus` 增加 `bVisible`，`CommandTable::visibleWhen()` 与 enabled/checked 共用状态源；
+  `CommandActions` 统一同步 text/icon/enabled/checked/visible，菜单、工具栏、右键、面板同一组 QAction。
+- profile 顶层 `contextMenus` 与 `menus` 共用节点语法和未知命令过滤；`MenuController` 复用命令动作池建右键菜单。
+- 通用右键入口 `IShellHost::showContextMenu()` / `IShellRuntime::createContextMenu()`（带默认实现，兼容旧宿主）；
+  生产 `SceneTreePanel` 经 `setContextMenuHandler()` 只上报坐标，April `PanelFactory` 绑定到 `"sceneTree"` 上下文。
+- 内置语言 / 皮肤动作优先复用共享命令，未登记时保留旧直连回退。
+- 新增 `AA::IRuntimeBinding` + `CustomerModule::runtimeBinding`：AppBootstrap 创建运行时后显式回绑，
+  `OperationCommandSink` 不再查全局运行时；`ActiveRuntime.h` 已删除；公开布局变化使 `kUiApiVersion` 升至 4。
+- 属性面板经客户层 `Apr::IPropertyPanelServices` 注入算法产物（`PropertyModel` + 编辑目标），
+  场景树只上报选中 id；面板不再自建数据。当前仅 2D 会话，3D 编辑服务待注入。
+- 左侧工具栏 Pan/Select 高亮改由共享 QAction 勾选态驱动，不再在控件上复制本地状态。
+- 清理 `AprilWorkbench` 中无调用方的 getter 与 `ShellServices` 镜像，中央视图只保留 ports 接线；
+  删除重复的 `Apr::CadServices` 接口、`AA::ActiveRuntime` 全局与已无调用方的 `UiLayoutService`。
+- 新增断言并入 `UiTstCommandTable` / `UiTstAssemblyPlanner` / `UiTstInteraction`，不新增测试二进制。
+- WIP 阻塞解除后已跑 baseline（25/25 + AprilShell 冒烟）、打包冒烟（PASSED）与全量 ctest；
+  全量 ctest 的 9 个失败均在未改动的 CAM / SY / Raster / ProcessingJob 路径，与 M6 无关。
 
 ## 6. `UiShell` 之外的旧文档
 

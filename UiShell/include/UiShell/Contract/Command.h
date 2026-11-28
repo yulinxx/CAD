@@ -25,6 +25,7 @@ namespace AA
     {
         bool bEnabled = true;   // 与功能开关叠加
         bool bChecked = false;  // 仅 bCheckable 命令有效
+        bool bVisible = true;   // 菜单 / 工具栏 / 面板共用动作的统一可见状态
     };
 
     class ICommandState

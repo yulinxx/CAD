@@ -41,7 +41,7 @@ bool CustomerModuleProvider::load()
     const QString customerFP = QString::fromLatin1(AA::customerBuildFingerprint());
     if (customerFP != hostFP)
     {
-        m_error = QStringLiteral("Tyvok Studiouild fingerprint mismatch\n  host: %1\n  dll : %2").arg(hostFP, customerFP);
+        m_error = QStringLiteral("customer module fingerprint mismatch\n  host: %1\n  dll : %2").arg(hostFP, customerFP);
 
         m_module = AA::CustomerModule();
         return false;

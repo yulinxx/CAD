@@ -214,6 +214,16 @@ void CustomerProfileTest::aprilProfileRestoresToolbarsAndNativeMenu()
     QCOMPARE(model.menus.size(), expectedMenus.size());
     for (int i = 0; i < expectedMenus.size(); ++i)
         QCOMPARE(model.menus.at(i).strId, expectedMenus.at(i));
+
+    // Scene-tree right-click is declared in the profile too, so it shares command ids
+    // and filtering with the menu bar instead of building private QActions in the widget.
+    QCOMPARE(model.contextMenus.size(), 1);
+    QCOMPARE(model.contextMenus.at(0).strId.toStdString(), std::string("sceneTree"));
+    QStringList contextCommands;
+    for (const MenuNodeSpec& child : model.contextMenus.at(0).children)
+        contextCommands.append(child.commandId);
+    QVERIFY(contextCommands.contains(QStringLiteral("edit.delete")));
+    QVERIFY(contextCommands.contains(QStringLiteral("edit.select_all")));
 }
 
 QTEST_GUILESS_MAIN(CustomerProfileTest)

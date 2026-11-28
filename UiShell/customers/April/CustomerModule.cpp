@@ -1,6 +1,7 @@
 #include "UiShell/Contract/CustomerModule.h"
 
 #include "UiShell/Contract/BuildFingerprint.h"
+#include "UiShell/Contract/IRuntimeBinding.h"
 
 #include <QFile>
 
@@ -34,7 +35,7 @@ namespace Apr
 
         // 本客户的全部部件：一个堆对象，CustomerModule 里的指针都指向它的成员。
         // 宿主经 CustomerModule::owner 接管，在运行期销毁后调用 destroy()；不使用任何全局变量。
-        class ModuleParts final : public AA::IApiObject
+        class ModuleParts final : public AA::IApiObject, public AA::IRuntimeBinding
         {
         public:
             CenterView centerView;
@@ -51,6 +52,12 @@ namespace Apr
             void destroy() override
             {
                 delete this;  // 在客户库内释放，不跨 CRT
+            }
+
+            // 外壳运行时晚于客户模块创建：由 AppBootstrap 显式回绑，命令出口不再查全局。
+            void bindRuntime(AA::IShellRuntime* runtime) override
+            {
+                commandSink.setShellRuntime(runtime);
             }
         };
     }  // namespace
@@ -83,6 +90,7 @@ namespace AA
         module.cmdInvoker = &parts->commands;    // M4
         module.cmdState = &parts->commands;      // M4
         module.cmdProfileRegistrar = &parts->commands;  // 外置 --profile 也能补齐菜单命令
+        module.runtimeBinding = static_cast<AA::IRuntimeBinding*>(parts);
 
         // M4：从客户自己的 ui.json 登记菜单引用的命令。AssemblyPlanner 只认目录里
         // 已有的命令，少了这一步整个 April 菜单都会被当“未知命令”过滤掉。
@@ -100,12 +108,15 @@ namespace AA
         parts->commands.addCommand(AA::CommandView{ QString::fromLatin1(AA::samples::kSampleRunCmdId) });
 
         // #2 组合根接线：April -> ApplicationCompositionRoot::build()
-        //   -> AprilWorkbench::bindViewportServices + Commands::setSink(OperationCommandSink)
+        //   -> viewport factory 注入 + Commands::setSink(OperationCommandSink)
         // 不抛；build()/接线失败返回 built/wired=false（见 CompositionRoot.h）。
         // 状态栏 sink 由面板工厂注册到 workbench，后续每次视口刷新都会自动带上。
         parts->panels.setWorkbench(&parts->centerView);
         attachCompositionRoot(parts->centerView, parts->commands, parts->wiring,
             parts->commandSink, parts->toolSwitchRegistry);
+        // 属性面板走窄接口：适配层从组合根产出的 PropertyModel / 编辑目标注入面板。
+        if (parts->wiring.adapter)
+            parts->panels.setPropertyServices(parts->wiring.adapter->propertyPanelServices());
         // M3：centerView 是 Apr::CenterView（: Apr::AprilWorkbench），
         // createCenterView 返回现有 RenderViewport2D / Viewport3D；
         // 视口服务由本客户持有并注入；与 UiShell ShellServices 互转。

@@ -29,10 +29,6 @@ public:
     QString language() const;
 
 private:
-    // --lang <strId> 指定语言
-    static QString requestedLanguage();
-
-private:
     AA::ApiPtr<AA::ITranslationService> m_transService;
     AA::ApiPtr<AA::IQtTextProvider> m_text;
 };

@@ -113,7 +113,8 @@ namespace AA
             QStringLiteral("window"),
             QStringLiteral("regions"),
             QStringLiteral("panels"),
-            QStringLiteral("menus") };
+            QStringLiteral("menus"),
+            QStringLiteral("contextMenus") };
 
         for (auto it = root.constBegin(); it != root.constEnd(); ++it)
         {
@@ -556,6 +557,39 @@ namespace AA
                     addError(diagnostics, menuPath + QStringLiteral(".id"), QStringLiteral("menu id is required"));
 
                 model.menus.append(menu);
+            }
+        }
+
+        // ---- contextMenus：与 menus 共用节点语法，但第一层是“右键菜单 id → 菜单项” ----
+        // 右键不再由控件自建 QAction：这里只产出数据，由 MenuController 复用命令动作池构建。
+        const QJsonValue contextMenusValue = root.value(QStringLiteral("contextMenus"));
+        if (!contextMenusValue.isUndefined() && !contextMenusValue.isArray())
+        {
+            addError(diagnostics, QStringLiteral("$.contextMenus"), QStringLiteral("must be an array"));
+        }
+        else if (contextMenusValue.isArray())
+        {
+            const QJsonArray contextMenus = contextMenusValue.toArray();
+            const int menuCount = static_cast<int>(std::min<qsizetype>(contextMenus.size(), ProfileLimits::maxTopLevelMenus));
+            if (contextMenus.size() > ProfileLimits::maxTopLevelMenus)
+            {
+                addError(diagnostics,
+                    QStringLiteral("$.contextMenus"),
+                    QStringLiteral("too many context menus (%1, limit %2)")
+                    .arg(contextMenus.size())
+                    .arg(ProfileLimits::maxTopLevelMenus));
+            }
+            for (int i = 0; i < menuCount; ++i)
+            {
+                const QString menuPath = QStringLiteral("$.contextMenus[%1]").arg(i);
+                MenuNodeSpec menu = parseMenuNode(contextMenus.at(i), menuPath, 0);
+                if (menu.type != MenuNodeType::Separator)
+                    menu.type = MenuNodeType::Submenu;
+
+                if (menu.strId.isEmpty())
+                    addError(diagnostics, menuPath + QStringLiteral(".id"), QStringLiteral("context menu id is required"));
+
+                model.contextMenus.append(menu);
             }
         }
 

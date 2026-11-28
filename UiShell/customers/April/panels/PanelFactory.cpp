@@ -1,6 +1,7 @@
 #include "PanelFactory.h"
 
 #include <QAction>
+#include <QPoint>
 #include <QJsonArray>
 #include <QJsonValue>
 #include <QPointer>
@@ -21,9 +22,7 @@
 
 namespace
 {
-    constexpr const char* kPanModeProperty = "april.drawTools.panMode";
     constexpr const char* kToolNameProperty = "toolName";
-    constexpr const char* kLegacyToolBarIdProperty = "legacyToolBarId";
     constexpr const char* kSeparatorCommand = "separator";
 
     // profile 的 props.commands 允许字符串与对象两种写法；对象用 commandId/id 取命令名。
@@ -69,15 +68,33 @@ namespace
     {
         auto* bar = new DrawToolBarWidget(info.parent);
         bar->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-        bar->setProperty(kPanModeProperty, false);
 
-        // Select/Pan 切换与旧 Workbench2D 行为对齐：按钮点下去既切视口模式，也刷新高亮。
-        bar->setIsPanModeCallback([bar]() {
-            return bar->property(kPanModeProperty).toBool();
+        // Select/Pan 高亮不再复制到控件属性：共享命令动作的勾选态就是唯一状态源，
+        // 菜单 / 工具栏 / 右键 / 面板因此看到同一份活动工具状态。
+        QPointer<QAction> panAction;
+        QPointer<QAction> selectAction;
+        if (info.host)
+        {
+            panAction = info.host->commandAction(QStringLiteral("view.pan"));
+            selectAction = info.host->commandAction(QStringLiteral("tool.select"));
+            if (panAction)
+                panAction->setCheckable(true);
+            if (selectAction)
+            {
+                selectAction->setCheckable(true);
+                selectAction->setChecked(true);
+            }
+        }
+
+        bar->setIsPanModeCallback([panAction]() {
+            return panAction && panAction->isChecked();
         });
-        bar->setPanModeToggleCallback([bar, host = info.host]() {
-            const bool enterPan = !bar->property(kPanModeProperty).toBool();
-            bar->setProperty(kPanModeProperty, enterPan);
+        bar->setPanModeToggleCallback([bar, host = info.host, panAction, selectAction]() {
+            const bool enterPan = !(panAction && panAction->isChecked());
+            if (panAction)
+                panAction->setChecked(enterPan);
+            if (selectAction)
+                selectAction->setChecked(!enterPan);
             bar->setCurrentToolName(enterPan ? QStringLiteral("PanTool") : QStringLiteral("SelectTool"));
             if (host)
                 host->invoke(enterPan ? QStringLiteral("view.pan") : QStringLiteral("tool.select"));
@@ -102,18 +119,26 @@ namespace
                 action->setProperty(kToolNameProperty, QString::fromUtf8(entry.toolName));
                 actions.append(action);
 
-                QObject::connect(action, &QAction::triggered, bar, [bar, action]() {
-                    bar->setProperty(kPanModeProperty, false);
-                    bar->setCurrentToolName(action->property(kToolNameProperty).toString());
-                });
+                QObject::connect(action, &QAction::triggered, bar,
+                    [bar, action, panAction, selectAction]() {
+                        if (panAction)
+                            panAction->setChecked(false);
+                        if (selectAction)
+                            selectAction->setChecked(action == selectAction.data());
+                        bar->setCurrentToolName(action->property(kToolNameProperty).toString());
+                    });
             }
 
-            if (QAction* panAction = info.host->commandAction(QStringLiteral("view.pan")))
+            if (panAction)
             {
-                QObject::connect(panAction, &QAction::triggered, bar, [bar]() {
-                    bar->setProperty(kPanModeProperty, true);
-                    bar->setCurrentToolName(QStringLiteral("PanTool"));
-                });
+                QObject::connect(panAction.data(), &QAction::triggered, bar,
+                    [bar, panAction, selectAction]() {
+                        if (panAction)
+                            panAction->setChecked(true);
+                        if (selectAction)
+                            selectAction->setChecked(false);
+                        bar->setCurrentToolName(QStringLiteral("PanTool"));
+                    });
             }
         }
 
@@ -126,7 +151,6 @@ namespace
     {
         auto* bar = new TopToolBar(info.parent);
         bar->setObjectName(QStringLiteral("panel:") + info.strPanelId);
-        bar->setProperty(kLegacyToolBarIdProperty, QStringLiteral("TopToolBar"));
 
         if (info.host)
         {
@@ -168,11 +192,26 @@ namespace Apr
             return createTopToolBar(info);
         }
 
-        // 旧场景树（service 注入后 setMode2D/setMode3D；这里只构造）
+        // 场景树：右键只报告上下文与坐标，菜单项 / 状态由外壳按 profile 命令统一构建。
+        // 控件不再自己 new QAction，也不直接连业务信号；旧框架的自建菜单仅在无 host 时保留。
         if (id == QLatin1String("scene") || id == QLatin1String("sceneTree") || id == QLatin1String("sceneTreePanel"))
         {
             auto* tree = new SceneTreePanel(parent);
             tree->setObjectName(QStringLiteral("panel:") + id);
+            if (info.host)
+            {
+                tree->setContextMenuHandler([host = info.host, tree](const QPoint& globalPos) {
+                    host->showContextMenu(QStringLiteral("sceneTree"), globalPos, tree);
+                });
+            }
+
+            // 场景树只报告选中 id；属性模型/编辑目标由算法适配层生成，
+            // 面板与场景树都不认识引擎。以 tree 为连接上下文，面板销毁由 QPointer 兜底。
+            QObject::connect(tree, &SceneTreePanel::selectionChanged, tree,
+                [this](const QStringList& ids) {
+                    m_lastSelectionIds = ids;
+                    refreshPropertiesPanel();
+                });
             return tree;
         }
 
@@ -181,6 +220,9 @@ namespace Apr
         {
             auto* props = new PropertiesPanelWidget(parent);
             props->setObjectName(QStringLiteral("panel:") + id);
+            m_propertiesPanel = props;
+            // 面板可能晚于场景树创建：用最近一次选择快照补齐，避免空面板一直停留。
+            refreshPropertiesPanel();
             return props;
         }
 
@@ -204,5 +246,16 @@ namespace Apr
         auto* placeholder = new QWidget(parent);
         placeholder->setObjectName(QStringLiteral("panel:") + id);
         return placeholder;
+    }
+
+    void PanelFactory::refreshPropertiesPanel()
+    {
+        PropertiesPanelWidget* panel = m_propertiesPanel.data();
+        if (!panel || !m_propertyServices)
+            return;
+
+        // 每次选择变化都重建编辑会话：会话只持有图元 id，撤销后不会留下悬空指针。
+        panel->setEditTarget(m_propertyServices->createEditTarget(m_lastSelectionIds));
+        panel->setPropertyModel(m_propertyServices->buildPropertyModel(m_lastSelectionIds));
     }
 }  // namespace Apr

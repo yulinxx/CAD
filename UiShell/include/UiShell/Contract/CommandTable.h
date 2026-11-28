@@ -98,6 +98,14 @@ namespace AA
             return *this;
         }
 
+        // 与 enabledWhen 同一状态源：控制菜单 / 工具栏 / 面板共用动作的可见性。
+        CommandTable& visibleWhen(Predicate visible)
+        {
+            if (Entry* entry = last())
+                entry->visible = std::move(visible);
+            return *this;
+        }
+
         // 标记为 checkable，勾选值取自 checked。
         CommandTable& checkedWhen(Predicate checked)
         {
@@ -138,6 +146,9 @@ namespace AA
 
             if (entry->enabled)
                 status.bEnabled = entry->enabled();
+
+            if (entry->visible)
+                status.bVisible = entry->visible();
 
             if (entry->checked)
                 status.bChecked = entry->checked();
@@ -192,6 +203,7 @@ namespace AA
             CommandView view;
             Handler handler;
             Predicate enabled;
+            Predicate visible;
             Predicate checked;
         };
 

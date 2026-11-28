@@ -8,7 +8,6 @@
 #include "UI2D/Operation/OperationBus.h"
 #include "UI2D/Operation/OperationRouting.h"
 #include "UiDialogs/AboutDialogs.h"
-#include "UiShell/Assembly/ActiveRuntime.h"
 #include "UiShell/Assembly/IShellRuntime.h"
 
 namespace
@@ -43,7 +42,7 @@ namespace Apr
 {
     void OperationCommandSink::dispatch(const QString& commandId, const QVariantMap& params)
     {
-        AA::IShellRuntime* runtime = AA::activeRuntime();
+        AA::IShellRuntime* runtime = m_shellRuntime;
 
         if (commandId.startsWith(QLatin1String("theme.")))
         {

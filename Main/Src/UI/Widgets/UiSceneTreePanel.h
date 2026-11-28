@@ -13,6 +13,7 @@
  *   - UI 层：本类，只消费数据 + 回调，不感知引擎细节
  */
 
+#include <QPoint>
 #include <QSet>
 #include <QString>
 #include <QStringList>
@@ -90,6 +91,11 @@ public:
     /// 2D 专用：设置命令状态
     bool setCommandState(bool hasSelection, bool anyLocked);
 
+    /// 右键菜单桥接：设置后右键交给宿主按命令统一构建（菜单项与状态由外壳共享动作池维护）。
+    /// 未设置时保留控件自建菜单，供旧框架 / 测试继续使用。
+    using ContextMenuHandler = std::function<void(const QPoint& globalPos)>;
+    void setContextMenuHandler(ContextMenuHandler handler);
+
 signals:
     /// 用户在树中改变选择（ids 为选中的引擎图元 ID）
     void selectionChanged(const QStringList& ids);
@@ -120,6 +126,7 @@ signals:
     QTreeView* m_view{ nullptr };
     QMenu* m_contextMenu{ nullptr };
     QAbstractItemModel* m_model{ nullptr };
+    ContextMenuHandler m_contextMenuHandler;
     Mode m_mode{ Mode::Mode2D };
 
     /// 程序化同步选中期间置位，抑制 selectionChanged 信号回环

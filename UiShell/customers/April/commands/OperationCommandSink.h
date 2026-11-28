@@ -8,6 +8,11 @@
 
 class OperationBus;
 
+namespace AA
+{
+    class IShellRuntime;
+}
+
 namespace Apr
 {
     // 轻量接口：Commands 只依赖它，独立测试无需链接 OperationBus/UiShell 实现。
@@ -28,6 +33,8 @@ namespace Apr
         using WorkbenchSwitch = std::function<void(const QString&)>;
 
         void setBus(OperationBus* bus) { m_bus = bus; }
+        // 由 CustomerModule 经 IRuntimeBinding 回绑，替代进程级全局运行时查找。
+        void setShellRuntime(AA::IShellRuntime* runtime) { m_shellRuntime = runtime; }
         void setWorkbenchSwitch(WorkbenchSwitch fn) { m_workbenchSwitch = std::move(fn); }
 
         void dispatch(const QString& commandId, const QVariantMap& params = {}) override;
@@ -35,6 +42,7 @@ namespace Apr
 
     private:
         OperationBus* m_bus = nullptr;
+        AA::IShellRuntime* m_shellRuntime = nullptr;
         WorkbenchSwitch m_workbenchSwitch;
     };
 }  // namespace Apr

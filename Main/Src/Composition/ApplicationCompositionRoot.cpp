@@ -18,7 +18,6 @@
 #include "UI2D/Operation/OperationRegistry.h"
 #include "UI2D/Operation/OperationRouting.h"
 
-#include "UI/Services/UiLayoutService.h"
 #include "UI/Services/UiServices.h"
 #include <QMainWindow>
 #include "UI/Services/UiStateCenter.h"
@@ -257,7 +256,6 @@ ISelectionService* ApplicationCompositionRoot::selectionService()
 // 装配顺序：UI 基础服务 → 导入导出 → 对话框服务 → 脏状态同步 → 操作注册
 ApplicationCompositionRoot::ApplicationCompositionRoot()
     : m_stateCenter(std::make_unique<UiStateCenter>())
-    , m_layoutService(std::make_unique<DefaultUiLayoutService>())
     , m_operationBus(std::make_unique<OperationBus>())
     , m_sceneManager(std::make_unique<Eg::SceneManager>())
     , m_sceneManager3D(std::make_unique<Eg::SceneManager3D>())
@@ -573,11 +571,6 @@ AlgorithmRunner* ApplicationCompositionRoot::algorithmRunner()
 UiStateCenter* ApplicationCompositionRoot::stateCenter()
 {
     return m_stateCenter.get();
-}
-
-UiLayoutService* ApplicationCompositionRoot::layoutService()
-{
-    return m_layoutService.get();
 }
 
 OperationBus* ApplicationCompositionRoot::operationBus()

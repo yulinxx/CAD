@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QHash>
 #include <QJsonObject>
 #include <QList>
 #include <QString>
@@ -84,6 +85,9 @@ namespace AA
     {
         QList<RegionInfo> regions;
         QList<MenuNodeInfo> menus;
+
+        // 右键菜单：id → 菜单项树；与 menus 一样只含数据，QMenu 由 MenuController 按共享动作构建。
+        QHash<QString, QList<MenuNodeInfo>> contextMenus;
 
         TitleBarInfo titleBar;
 

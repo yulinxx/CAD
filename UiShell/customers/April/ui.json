@@ -1605,5 +1605,21 @@
         }
       ]
     }
+  ],
+  "contextMenus": [
+    {
+      "id": "sceneTree",
+      "type": "submenu",
+      "titleKey": "Scene",
+      "order": 10,
+      "children": [
+        { "type": "command", "commandId": "edit.delete", "titleKey": "Delete" },
+        { "type": "separator" },
+        { "type": "command", "commandId": "edit.select_all", "titleKey": "Select All" },
+        { "type": "command", "commandId": "edit.deselect", "titleKey": "Clear Selection" },
+        { "type": "separator" },
+        { "type": "command", "commandId": "view.layer_manager", "titleKey": "Layer Manager..." }
+      ]
+    }
   ]
 }

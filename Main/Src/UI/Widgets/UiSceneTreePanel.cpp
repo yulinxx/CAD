@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <utility>
 #include <vector>
 
 namespace
@@ -1381,9 +1382,26 @@ void SceneTreePanel::retranslateMenu()
     }
 }
 
+void SceneTreePanel::setContextMenuHandler(ContextMenuHandler handler)
+{
+    m_contextMenuHandler = std::move(handler);
+}
+
 void SceneTreePanel::showContextMenu(const QPoint& pos)
 {
-    if (!m_contextMenu || !m_view)
+    if (!m_view)
+    {
+        return;
+    }
+
+    // 生产路径：控件只报告“用户在此处点了右键”，菜单内容由宿主按 profile 命令构建。
+    if (m_contextMenuHandler)
+    {
+        m_contextMenuHandler(m_view->viewport()->mapToGlobal(pos));
+        return;
+    }
+
+    if (!m_contextMenu)
     {
         return;
     }

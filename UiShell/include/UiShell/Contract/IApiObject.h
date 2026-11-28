@@ -3,7 +3,7 @@
 namespace AA
 {
     // 跨 DLL 版本号
-    constexpr int kUiApiVersion = 3;
+    constexpr int kUiApiVersion = 4;
 
     // 跨 DLL 对象释放：释放在 DLL 内完成，避免跨 CRT 直接 delete
     // 析构函数 protected，只能经 destroy()/ApiPtr 释放；派生类同样声明析构函数为 protected

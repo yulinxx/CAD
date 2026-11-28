@@ -68,8 +68,9 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 `wireCompositionRoot()` 曾在栈上构造 `CompositionRootAdapter` 并把它（连同内部的
 `DefaultViewportFactory`）注入 `AprilWorkbench`；函数返回后这些指针悬空，第一次
 创建视口即跳到非法地址。现在 adapter 由 `ModuleParts.wiring` 长期持有，
-`AprilWorkbench` 只经 `IViewportServices` / `ICadViewport::bindServices` 使用抽象视图，
-不接触 `ApplicationCompositionRoot` 或具体算法对象。
+`AprilWorkbench` 当时只经 `IViewportServices` / `ICadViewport::bindServices` 使用抽象视图，
+不接触 `ApplicationCompositionRoot` 或具体算法对象（该注入链已在后续清理中删除，
+适配查询留在 `CompositionRootAdapter`）。
 
 全新的空 build 目录当前会卡在 vcpkg baseline（`versions/baseline.json` 在本地 vcpkg
 提交中缺失），因此基线验收使用已配置好的 `build/`；该环境问题单独处理，不要误判为框架回归。
@@ -219,7 +220,7 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
 - **启动崩溃**：已修复（adapter 生命周期，见 §0.5）；最小 profile 冒烟进入事件循环。
 - **组合根**：`ApplicationCompositionRoot` 在 `Main/Src/Composition`（不在 `AprilUi` 内）。
   `attachCompositionRoot()` 现在把 adapter / viewportFactory 交给 `ModuleParts.wiring` 持有，
-  `wireCompositionRoot()` 经 `IViewportServices` 真注入，并把 `SceneDocument2D` /
+  `wireCompositionRoot()` 经 `IViewportServices` 就绪查询并把 `SceneDocument2D` /
   `OperationBus` / `ISelectionService` / `LayerManager` 转发给 `DefaultViewportFactory`；
   不再有栈上悬空指针。
 - **资源注册**：`AprilUi` 的 `:/configs/...` 等在 `April` 可执行目标注册；`AprilShell` 的
@@ -240,7 +241,8 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   - **不重写命令系统**，复用 `CommandCatalog` / `OperationRouting` / `OperationBus` / `OperationRegistry`。
     M6 后生产路径不再经过旧 `IUiCommandDispatcher`。
 - `CustomerModule.cpp`：`ModuleParts` 持有 `Commands commands`；`module.cmdCatalog/cmdInvoker/cmdState = &parts->commands`。
-- `AprilWorkbench::applyShellServices` / `populateShellServices` 已转发 `cmdCatalog/cmdInvoker/cmdState`。
+- `AprilWorkbench::applyShellServices` / `populateShellServices` 曾转发 `cmdCatalog/cmdInvoker/cmdState`
+  （该 ShellServices 镜像层已在后续清理中删除，命令由 `Apr::Commands` 直接提供）。
 - **菜单转换已完成**：`customers/April/ui.json` 的 8 个菜单覆盖 `configs/base.json` 的全部 184 个 id
   （`action→command`，`command→commandId`，`label→titleKey`，`icon→iconKey`，保留 `separator`/`submenu`）。
 - **目录登记**：`Commands::addCommandsFromProfile()` 从客户 profile 的 `menus` 递归登记所有
@@ -297,11 +299,12 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   初始化、资源、崩溃处理、授权、退出保存、关停）；`AprilShell` 仍是不带产品钩子的薄 EXE。
   旧的 `main.cpp`、`AppBootstrapper.*`、`CADApplicationEntry.cpp`、`CADApplicationRuntime.*` 已删除。
 - **宿主注入**：`AppBootstrap` 在创建客户模块前通过 `IHostWindow` 发布宿主 `QMainWindow`；
-  `ShellRuntime` 通过 `IActiveRuntime` 发布当前运行时。`ApplicationCompositionRoot` 去掉
-  `UiShellHost` 成员，改为消费主窗口；`OperationRegistrar` 已从 `m_root.mainWindow()` 取窗口。
+  当时 `ShellRuntime` 通过 `IActiveRuntime` 发布当前运行时（现改为 `IRuntimeBinding` 显式回绑）。
+  `ApplicationCompositionRoot` 去掉 `UiShellHost` 成员，改为消费主窗口；`OperationRegistrar`
+  已从 `m_root.mainWindow()` 取窗口。
 - **命令出口**：`OperationCommandSink`（轻量接口 `ICommandSink`）替代 `IUiCommandDispatcher`，
-  使独立菜单目录测试仍只需编译 `Commands.cpp`。`CompositionRootAdapter::dispatchOperation()`
-  也委托给该 sink。
+  使独立菜单目录测试仍只需编译 `Commands.cpp`。当时的
+  `CompositionRootAdapter::dispatchOperation()` 也委托给该 sink（方法已在 port 收敛时删除）。
 - **测试专用旧 UI**：`UI/ClientConfig`、`UI/Workbench`、`UiShellHost`、`DevicePanel` 等的
   实现/头文件移到 `Main/Src/UI/Test/LegacyUI/`；生产源集合和 qrc 过滤 `/Test/`，`MainTests`
   显式加入这些源码与 include 目录，原有覆盖继续运行。`Workbench3D.cpp` 里用户 WIP 的
@@ -359,6 +362,70 @@ Step 0 为使 April 满足共享集成测试契约，在 `customers/April/Custom
   4 条生产接线用例全部通过。全目标构建此刻被用户 WIP 阻塞（Engine/2D 缺
   `Engine2D/Geometry/Geo2DEdit.h`、`IPropertySink::addInt/addBool`、`Vec::sqrLength`），
   按约定不修改这些 WIP；待其复位后重跑 baseline 与打包冒烟。
+
+### 命令状态与右键统一（进行中，未提交）
+
+本轮继续做“菜单 / 工具栏 / 右键 / 面板统一走命令”的基础设施，仍保持 core 不认识客户：
+
+- `AA::CommandStatus` 增加 `bVisible`，`CommandTable::visibleWhen()` 把它纳入同一状态源；
+  `CommandActions` 统一同步 text/icon/enabled/checked/visible。客户 `Apr::Commands::queryState()`
+  不再无条件写 `bChecked=false`，避免覆盖 checkable 命令的勾选态。
+- profile 新增顶层 `contextMenus`：与 `menus` 共用 `MenuNodeSpec` 语法、未知命令过滤和顺序规则。
+  `AssemblyPlanner` 产出 `AssemblyInfo::contextMenus`（id → 节点树），
+  `MenuController::buildContextMenu()` 复用命令动作池建 `QMenu`，不再由控件自建 QAction。
+- `IShellHost::showContextMenu(contextMenuId, globalPos, anchor)` + `IShellRuntime::createContextMenu()`
+  是通用右键入口（都给了默认实现，兼容已有宿主）。`ShellRuntime::PanelHost` 原样转发；
+  生产 `SceneTreePanel` 通过 `setContextMenuHandler()` 只上报上下文与坐标，
+  April `PanelFactory` 把它绑到 `showContextMenu("sceneTree", ...)`。未注入 handler 时保留旧自建菜单，
+  仅供 `Main/Src/UI/Test/LegacyUI/` 的旧框架测试使用。
+- 内置语言 / 皮肤菜单优先复用 `language.<id>` / `theme.<id>` 共享命令动作；
+  目录未登记时回退到旧直连动作，避免破坏仍使用 `builtin` 节点的旧 profile。
+- `Apr::Commands::addCommandsFromProfile()` 同时从 `contextMenus` 登记命令，
+  保证右键专属命令不会被规划器过滤。
+- 新增 `AA::IRuntimeBinding` + `CustomerModule::runtimeBinding`：宿主创建运行时后显式回绑，
+  `Apr::OperationCommandSink` 不再依赖进程级全局运行时（原 `AA::activeRuntime()` 已删除）；析构前清空缓存。
+- `PanelFactory` 的 Pan/Select 高亮不再写入控件本地属性，改由 `view.pan` / `tool.select`
+  共享 `QAction` 的勾选态驱动；`CommandActions::refresh()` 保留该勾选态，四入口同步。
+- 用例并入既有二进制：`UiTstCommandTable`（visible 状态源）、`UiTstAssemblyPlanner`
+  （右键命令过滤）、`UiTstInteraction`（右键与菜单 / 工具栏共享同一 QAction）。未新增测试目标。
+
+- 新增客户层窄端口 `Apr::IPropertyPanelServices`：`CompositionRootAdapter` 用 2D 属性会话生成
+  `PropertyModel` / `IPropertyEditTarget`；`SceneTreePanel::selectionChanged` 只上报选中 id，
+  `PanelFactory` 把算法产物注入 `PropertiesPanelWidget`。面板与场景树都不接触引擎、SceneEditService 或撤销实现。
+- 清理客户层遗留的无调用方接线：`AprilWorkbench` 删掉 `viewportKind()` / `viewportFactory()` /
+  `serviceFactory()` / `centerWidget()` 与 `ShellServices` 镜像（`applyShellServices` / `populateShellServices`
+  及其字段），`CompositionRoot` 不再调用 `setServiceFactory()`；
+  `ports/ICadServiceFactory.h` 删掉重复的 `CadServices` 接口。
+  中央视图现在只通过 ports 工作，头文件也不再拖入 `UiServices` / `UiStateCenter`。
+- port 层继续收敛：`ICadViewport::bindServices` / `RenderViewport2DAdapter::services()` /
+  `AprilWorkbench::bindViewportServices()` 均无读者，连同字段一起删除；
+  `IViewportServices` 只保留 `hasSceneDocument2D/hasOperationBus/hasUiServices` 三个就绪查询，
+  `CompositionRootAdapter` 同步删掉未使用的 `canUndo/canRedo/undo/redo/dispatchOperation`
+  与 `setCommandSink`；`ICadServiceFactory.h` 整个删除，`viewportFactory()` 成为 adapter 直接访问器。
+- `AA::ActiveRuntime.h` 与 `setActiveRuntime/activeRuntime` 删除（显式 `IRuntimeBinding` 后已无读者）。
+- `UiLayoutService` 从 `ApplicationCompositionRoot` 移除：M6 后窗口布局由外壳负责，
+  组合根不再持有布局服务；服务文件本身也删除（`WorkbenchWindow` 测试代码不再需要它）。
+
+**验证状态**：WIP 阻塞解除后已跑 `BUILD_DIR=build bash UiShell/ci/ui-shell-baseline.sh`
+（全目标构建、`UiTst|UiLayerCheck` 25/25、AprilShell 冒烟）和
+`python3 Tools/package_smoke_test.py --build-dir build --qt-dir "$HOME/Qt/6.12.0/macos"`（PASSED）。
+全量 `ctest --test-dir build -j 4` 共 9 个失败，均在未改动的 CAM / SY / Raster / ProcessingJob
+路径（实体类型枚举计数、`.sy` 格式识别、光栅加工路径与机床行程限制），与 M6 无关。
+用户 WIP（Engine 子模块、include ratchet 等）仍未提交，本轮未触碰。
+属性面板目前只接 2D 会话（组合根未暴露 `SceneEditService3D`），3D 下展示空模型；后续需补 3D 编辑服务注入。
+
+**已知低耦合例外（显式登记，避免被误认为已完成）**：
+
+- `customers/April` 可见 `AA::IShellRuntime` / `AA::ICommand*`（Assembly 窄契约），
+  `UiLayerCheck` 目前只扫描 `customers/*/CustomerModule.cpp`，未覆盖 `commands/` 与 `panels/`。
+- `OperationCommandSink` 已改为显式注入：`CustomerModule::runtimeBinding` 由 April
+  `ModuleParts` 实现，`AppBootstrap` 在创建运行时后回绑、析构前清空；
+  客户命令出口不再查全局运行时；`ActiveRuntime.h` 与 `setActiveRuntime/activeRuntime`
+  已随最后读者一起删除。因 `CustomerModule` 公开布局变化，`kUiApiVersion` 升至 4。
+- 通用 `main` 保留 `APR_PRODUCT_STARTUP` 产品 hook（`AprilShellStartup`），
+  由编译开关控制，非 `if (customer == ...)` 分支。
+- `MenuPresenter` / `IMenuPresenter` 已删除（无生产 / 测试调用方），
+  唯一菜单实现是 `MenuController`；`kUiApiVersion=4` 会让旧二进制指纹校验失败，不会误链接。
 
 ## 4. 验收标准（每个里程碑都要满足）
 

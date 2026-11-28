@@ -315,6 +315,27 @@ namespace AA
                     return a.strId < b.strId;
                     });
 
+                // 右键菜单用同一套节点构建与未知命令过滤规则，保证右键和主菜单状态一致。
+                for (const MenuNodeSpec& menu : model.contextMenus)
+                {
+                    if (menu.strId.isEmpty() && menu.type != MenuNodeType::Separator)
+                    {
+                        info.strListWarnings.append(QStringLiteral("context menu without id"));
+                        continue;
+                    }
+                    auto menuInfo = buildNode(menu, menu.strId);
+                    if (!menuInfo.has_value())
+                        continue;
+
+                    std::sort(menuInfo->children.begin(), menuInfo->children.end(),
+                        [](const MenuNodeInfo& a, const MenuNodeInfo& b) {
+                        if (a.nOrder != b.nOrder)
+                            return a.nOrder < b.nOrder;
+                        return a.strCmdId < b.strCmdId;
+                    });
+                    info.contextMenus.insert(menu.strId, std::move(menuInfo->children));
+                }
+
                 // 内置 Help 扩展（语言/皮肤子菜单）移到 MenuController 处理：
                 // 构建时能访问 services.translations，从 builtinLanguages() 动态填充。
                 // 这里不再注入占位，避免硬编码语言数量。

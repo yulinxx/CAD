@@ -17,6 +17,7 @@
 #include "Assembly/Host/ThemedIcon.h"
 #include "Model/Assembly/AssemblyInfo.h"
 #include "UiShell/Assembly/ShellServices.h"
+#include "UiShell/Contract/Command.h"
 #include "UiShell/Contract/HostContext.h"
 #include "UiShell/i18n/ITranslationService.h"
 
@@ -49,55 +50,6 @@ namespace AA
         menuBar->setObjectName(QStringLiteral("msui.menubar"));
         menuBar->setNativeMenuBar(nativeMenuBar);
 
-        // 将 MenuNodeInfo 追加到上一级 QMenu
-        std::function<void(QMenu*, const MenuNodeInfo&)> funcAppendNode;
-        funcAppendNode = [&](QMenu* parentMenu, const MenuNodeInfo& info) -> void {
-            switch (info.type)
-            {
-            case MenuNodeType::Separator:
-                parentMenu->addSeparator();
-                break;
-
-            case MenuNodeType::Command:
-            {
-                QAction* action = m_actions.action(info.strCmdId);
-                if (!action)
-                    break;
-
-                // profile 也可以把命令项标成可勾选 / 放进互斥组（groupKey）。
-                if (info.bCheckable)
-                    action->setCheckable(true);
-                if (!info.strGroupKey.isEmpty())
-                    m_actions.addToGroup(action, info.strGroupKey);
-
-                parentMenu->addAction(action);
-            }
-            break;
-
-            case MenuNodeType::Builtin:
-                if (info.strId == QLatin1String(BuiltinMenuId::Language))
-                    appendLanguageMenu(parentMenu, info.strIconKey);
-                else if (info.strId == QLatin1String(BuiltinMenuId::Theme))
-                    appendThemeMenu(parentMenu, info.strIconKey);
-                break;
-
-            case MenuNodeType::Submenu:
-            {
-                const QString title =
-                    !info.strTitle.isEmpty() ? info.strTitle : (info.strTitleKey.isEmpty() ? info.strId : info.strTitleKey);
-                QMenu* sub = parentMenu->addMenu(title);
-                sub->setObjectName(QStringLiteral("msui.menu.") + info.strId);
-
-                if (!info.strIconKey.isEmpty())
-                    sub->menuAction()->setIcon(AA::themedIcon(info.strIconKey));
-
-                for (const MenuNodeInfo& child : info.children)
-                    funcAppendNode(sub, child);
-            }
-            break;
-            }
-            };
-
         for (const MenuNodeInfo& menuInfo : menus)
         {
             if (menuInfo.type == MenuNodeType::Submenu)
@@ -113,11 +65,77 @@ namespace AA
                     menu->menuAction()->setIcon(AA::themedIcon(menuInfo.strIconKey));
 
                 for (const MenuNodeInfo& child : menuInfo.children)
-                    funcAppendNode(menu, child);
+                    appendNode(menu, child);
             }
         }
 
         return menuBar;
+    }
+
+    void MenuController::appendNode(QMenu* parentMenu, const MenuNodeInfo& info) const
+    {
+        switch (info.type)
+        {
+        case MenuNodeType::Separator:
+            parentMenu->addSeparator();
+            break;
+
+        case MenuNodeType::Command:
+        {
+            QAction* action = m_actions.action(info.strCmdId);
+            if (!action)
+                break;
+
+            // profile 也可以把命令项标成可勾选 / 放进互斥组（groupKey）。
+            if (info.bCheckable)
+                action->setCheckable(true);
+            if (!info.strGroupKey.isEmpty())
+                m_actions.addToGroup(action, info.strGroupKey);
+
+            parentMenu->addAction(action);
+        }
+        break;
+
+        case MenuNodeType::Builtin:
+            if (info.strId == QLatin1String(BuiltinMenuId::Language))
+                appendLanguageMenu(parentMenu, info.strIconKey);
+            else if (info.strId == QLatin1String(BuiltinMenuId::Theme))
+                appendThemeMenu(parentMenu, info.strIconKey);
+            break;
+
+        case MenuNodeType::Submenu:
+        {
+            const QString title =
+                !info.strTitle.isEmpty() ? info.strTitle : (info.strTitleKey.isEmpty() ? info.strId : info.strTitleKey);
+            QMenu* sub = parentMenu->addMenu(title);
+            sub->setObjectName(QStringLiteral("msui.menu.") + info.strId);
+
+            if (!info.strIconKey.isEmpty())
+                sub->menuAction()->setIcon(AA::themedIcon(info.strIconKey));
+
+            for (const MenuNodeInfo& child : info.children)
+                appendNode(sub, child);
+        }
+        break;
+        }
+    }
+
+    QMenu* MenuController::buildContextMenu(const QList<MenuNodeInfo>& items, QWidget* parent) const
+    {
+        if (items.isEmpty())
+            return nullptr;
+
+        auto* menu = new QMenu(parent);
+        menu->setObjectName(QStringLiteral("msui.contextMenu"));
+        for (const MenuNodeInfo& info : items)
+            appendNode(menu, info);
+        return menu;
+    }
+
+    bool MenuController::hasRegisteredCommand(const QString& commandId) const
+    {
+        return m_shellServices && m_shellServices->cmdCatalog
+            && m_shellServices->cmdCatalog->find(commandId) != nullptr;
     }
 
     void MenuController::appendLanguageMenu(QMenu* parent, const QString& iconKey) const
@@ -144,7 +162,26 @@ namespace AA
             QString label = QLocale(langId).nativeLanguageName();
             if (label.isEmpty())
                 label = langId;
-            auto* action = langMenu->addAction(label);
+
+            // 目录里登记了 language.<id> 时复用共享动作：执行与状态同步都走命令总线。
+            // 没有命令目录时 CommandActions::action() 也会建动作，但它不会接到 invoke()，
+            // 因此这里必须先查目录，否则内置语言菜单会静默失效。
+            const QString commandId = QStringLiteral("language.") + langId;
+            QAction* action = hasRegisteredCommand(commandId) ? m_actions.action(commandId) : nullptr;
+            if (action)
+            {
+                action->setText(label);
+                action->setCheckable(true);
+                // 勾选态必须在这里初始化：共享动作由 CommandActions 持有，
+                // refresh() 只保留 isChecked()，不会替我们推断当前语言。
+                action->setChecked(langId == current);
+                group->addAction(action);
+                langMenu->addAction(action);
+                continue;
+            }
+
+            // 兼容旧 profile：未登记为命令时保留内置直连动作。
+            action = langMenu->addAction(label);
             action->setObjectName(QStringLiteral("msui.action.language.") + langId);
             action->setCheckable(true);
             action->setChecked(langId == current);
@@ -168,7 +205,22 @@ namespace AA
         for (const ThemeCatalog::Entry& entry : ThemeCatalog::entries())
         {
             const QString label = QCoreApplication::translate("ThemeMenu", entry.label);
-            auto* action = themeMenu->addAction(label);
+
+            // 与语言菜单一致：登记为命令时只复用共享动作，不再另建 QAction。
+            const QString commandId = QStringLiteral("theme.") + entry.strId;
+            QAction* action = hasRegisteredCommand(commandId) ? m_actions.action(commandId) : nullptr;
+            if (action)
+            {
+                action->setText(label);
+                action->setCheckable(true);
+                // 与语言菜单一致：共享动作的勾选态由菜单构建处同步当前皮肤。
+                action->setChecked(entry.strId == current);
+                group->addAction(action);
+                themeMenu->addAction(action);
+                continue;
+            }
+
+            action = themeMenu->addAction(label);
             action->setObjectName(QStringLiteral("msui.action.theme.") + entry.strId);
             action->setCheckable(true);
             action->setChecked(entry.strId == current);

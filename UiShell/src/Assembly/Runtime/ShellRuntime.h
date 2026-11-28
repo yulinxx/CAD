@@ -2,6 +2,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QPoint>
 #include <QPointer>
 #include <QString>
 
@@ -13,6 +14,7 @@
 #include "Model/Assembly/AssemblyInfo.h"
 
 class QMainWindow;
+class QMenu;
 class QWidget;
 
 namespace AA
@@ -54,6 +56,8 @@ namespace AA
         // 重建中央视图（工作台切换）
         void refreshCenterView() override;
 
+        QMenu* createContextMenu(const QString& contextMenuId, QWidget* parent = nullptr) override;
+
         // 切换皮肤
         void switchTheme(const QString& themeId) override;
 
@@ -94,6 +98,7 @@ namespace AA
         void invokeWithArgs(const QString& commandId, const QJsonObject& args) override;
         QAction* commandAction(const QString& commandId) override;
         void refreshCommands() override;
+        void showContextMenu(const QString& contextMenuId, const QPoint& globalPos, QWidget* anchor) override;
         bool activatePanel(const QString& panelId) override;
         void showMessage(const QString& text) override;
         DialogResult openDialog(const QString& dialogId, QWidget* parent, const QJsonObject& params = {}) override;
@@ -148,6 +153,11 @@ namespace AA
             void refreshCommands() override
             {
                 m_runtime.refreshCommands();
+            }
+
+            void showContextMenu(const QString& contextMenuId, const QPoint& globalPos, QWidget* anchor) override
+            {
+                m_runtime.showContextMenu(contextMenuId, globalPos, anchor);
             }
 
             bool activatePanel(const QString& panelId) override

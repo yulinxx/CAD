@@ -107,6 +107,7 @@ namespace AA
         QList<RegionSpec> regions;
         QList<PanelSpec> panels;
         QList<MenuNodeSpec> menus;
+        QList<MenuNodeSpec> contextMenus;
 
         TitleBarSpec titleBar;
         WindowSpec window;

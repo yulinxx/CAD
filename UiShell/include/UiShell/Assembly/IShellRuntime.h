@@ -11,6 +11,7 @@
 #include "UiShell/Contract/Diagnostic.h"
 
 class QMainWindow;
+class QMenu;
 class QWidget;
 
 namespace AA
@@ -41,7 +42,6 @@ namespace AA
         virtual void switchTheme(const QString& themeId) = 0;
         virtual QString theme() const = 0;
 
-
         // profile 解析与诊断
         virtual const QList<Diagnostic>& diagnostics() const = 0;
         virtual QString lastError() const = 0;
@@ -49,6 +49,15 @@ namespace AA
 
         virtual IRegionContainer* regionContainer(const QString& regionId) const = 0;
         virtual IRegionContainer* regionContainerForPanel(const QString& panelId) const = 0;
+
+        // 右键菜单数据 → 共享命令动作的 QMenu；调用方负责在合适位置 exec() 或 show()。
+        // 默认返回空，兼容不提供右键能力的宿主实现。
+        virtual QMenu* createContextMenu(const QString& contextMenuId, QWidget* parent = nullptr)
+        {
+            Q_UNUSED(contextMenuId);
+            Q_UNUSED(parent);
+            return nullptr;
+        }
 
     protected:
         // 只能 destroy释放，禁止跨模块 delete
